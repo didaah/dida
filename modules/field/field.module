@@ -1,0 +1,1452 @@
+<?php
+// $Id$
+
+/**
+ * @file
+ *  field.module 实现表单字段定制
+ */
+
+/**
+ * @Implement of hook_menu()
+ */
+function field_menu() {
+  $items = array();
+
+  $items['fields/%'] = array(
+    'load_functions' => array(1 => array('field_load')),
+    'access_callback' => 'field_access',
+    'access_arguments' => array('view', 1),
+    'page_callback' => 'field_page',
+    'page_arguments' => array(1),
+    'file' => 'field.page.inc'
+  );
+
+  $items['category/%'] = array(
+    'load_functions' => array(1 => array('field_term_load')),
+    'access_callback' => 'field_term_access',
+    'access_arguments' => array(1),
+    'page_callback' => 'field_term_page',
+    'page_arguments' => array(1),
+    'file' => 'field.page.inc'
+  );
+
+  $items['category/%/feed'] = array(
+    'load_functions' => array(1 => array('field_term_load')),
+    'access_callback' => 'field_term_access',
+    'access_arguments' => array(1),
+    'page_callback' => 'field_term_feed',
+    'page_arguments' => array(1),
+    'file' => 'field.page.inc'
+  );
+
+  return $items;
+}
+
+/**
+ * @Implement of hook_system_tools_ajax()
+ */
+function field_system_tools_ajax($v, $g) {
+  module_include_file('field.page.inc', 'field');
+  return _field_system_tools_ajax($v, $g);
+}
+
+/**
+ * 字段权限验证，uid == 1 例外
+ * @param (string) $op
+ *  默认分两种权限，即：view：浏览，update：填写
+ *  字段依附于节点，故字段首先继承节点权限，如节点不允许浏览，字段也无法浏览
+ * @param (object) $field
+ *  字段数据，即 field_load() 返回的对象
+ * @param (object) $ac
+ *  用户信息，若留空，则取当前用户
+ * @return
+ *  通过验证返回 true，否则返回 false
+ */
+
+function field_access($op, $field, $node = NULL, $ac = NULL) {
+  if ($op == 'view' && $GLOBALS['user']->uid == 1) return true;
+  
+  if (!$ac) $ac = $GLOBALS['user'];
+
+  if ($ac->uid == 1) return true;
+  
+  static $access;
+
+  if (!isset($access[$ac->uid])) {
+    $access[$ac->uid] = array();
+    $access[$ac->uid][$field->field_id] = array();
+  }
+
+  if (!isset($access[$ac->uid][$field->field_id][$op])) {
+    // 默认不允许
+    $field->is_access = false;
+    
+    if (empty($field->access) && empty($field->access[$op])) {
+      // 若没有进行权限设置，则均视为允许
+      $field->is_access = true;
+    } else if (!empty($ac->roles) && is_array($field->access[$op])) {
+      // 按角色判断权限
+      foreach ($ac->roles as $rid => $k) {
+        if (in_array($rid, $field->access[$op])) {
+          $field->is_access = true;
+        }
+      }
+    }
+
+    /**
+     * 通过以上基本验证，触发 hook_field_get_access()
+     * 若通过验证，请将 $field->is_access 设为 true，反之设为 false
+     */
+    module_invoke_all('field_get_node_access', $op, $field, $node, $ac);
+    
+    $access[$ac->uid][$field->field_id][$op] = $field->is_access;
+  }
+  
+  return $access[$ac->uid][$field->field_id][$op];
+}
+
+/**
+ * 读取字段类型参数，字段类型及参数由 hook_field_call_list() 定义
+ * @param (string) $type
+ *  字段类型系统名称，不传值则获取全部
+ */
+function field_get_call_lists($name = NULL) {
+  static $lists;
+  if (!isset($lists)) {
+    $lists = array();
+    if ($modules = _module_invoke_all('field_call_list')) {
+      foreach ($modules as $module => $types) {
+        foreach ($types as $key => $type) {
+          $lists[$key] = $type;
+          $lists[$key]['module'] = $module;
+        }
+      }
+    }
+  }
+  return $name ? $lists[$name] : $lists;
+}
+
+/**
+ * 读取所有字段类型，用于表单
+ * @param (string) $name
+ *  字段组名
+ * @param (array) $group
+ *  字段分组信息，根据相关设置过滤指定类型。默认返回全部。
+ */
+function field_get_type_options($name = 0, $group = array()) {
+  static $options;
+  if (!isset($options[$name])) {
+    $options[$name] = array();
+    if ($group) {
+      if ($group['type'] && is_array($group['type'])) {
+        // 指定类型
+        foreach (field_get_call_lists() as $key => $value) {
+          if (in_array($key, $group['type'])) {
+            $options[$name][$key] = $value['title'];
+          }
+        }
+      } else if ($group['term']) {
+        $terms = field_get_term_type();
+        foreach (field_get_call_lists() as $key => $value) {
+          if (in_array($key, $terms)) {
+            $options[$name][$key] = $value['title'];
+          }
+        }
+      }
+    }
+    if (!$options[$name]) {
+      foreach (field_get_call_lists() as $key => $value) {
+        $options[$name][$key] = $value['title'];
+      }
+    }
+  }
+  return $options[$name];
+}
+
+/**
+ * @Implement of hook_field_call_list()
+ *  定义字段类型
+ */
+function field_field_call_list() {
+  return array(
+    'tags' => array( // tags 为字段类型系统名称
+      'title' => t('field', '标签'),
+      'form_type' => 'textfield', // textfield 为该字段对应的表单类型，如 tags 需要使用 textfield 来展示
+    ),
+    'checkbox' => array(
+      'title' => t('field', '复选框'),
+      'form_type' => 'checkbox',
+    ),
+    'radio' => array(
+      'title' => t('field', '选项按钮'),
+      'form_type' => 'radio',
+    ),
+    'select' => array(
+      'title' => t('field', '下拉单选框'),
+      'form_type' => 'select',
+    ),
+    'selects' => array(
+      'title' => t('field', '下拉复选框'),
+      'form_type' => 'selects',
+    ),
+    'textfield' => array(
+      'title' => t('field', '单行文本'),
+      'form_type' => 'textfield',
+    ),
+    'textarea' => array(
+      'title' => t('field', '多行文本'),
+      'form_type' => 'textarea',
+    ),
+    'file' => array(
+      'title' => t('field', '文件上传'),
+      'form_type' => 'file',
+    )
+  );
+}
+
+/**
+ * 传统型分类字段类型
+ */
+function field_get_term_type() {
+  $term = array('tags', 'checkbox', 'select', 'radio', 'selects');
+  module_alter_all('field_get_term_type', $term);
+  return $term;
+}
+
+/**
+ * 提供一个可视化的字段添加\编辑表单界面，供模块调用
+ * @param (object) $field
+ *  包含字段参数的对象。若是新增，也必须传递 type、module 两个参数
+ *  即：创建该字段的模块，以及自定义字段分组。分组必须由该模块定义
+ *  即：通过 hook_field_call_group() 可获取分组信息，否则无法操作
+ */
+function field_form($field) {
+  module_include_file('field.admin.inc', 'field');
+  // 将加载所有模块目录中的 field/admin.inc 文件，并执行 hook_field_call_form()
+  module_include_file('field/admin.inc');
+  return _field_form($field);
+}
+
+function field_form_validate($form, $v) {
+  return field_save($v['_dida_values']);
+}
+
+/**
+ * 保存一个字段
+ * @param (object) $field
+ *  字段对象，根据不同字段，成员各有不同，参见数据表 fields 结构
+ * @return
+ *  返回 array 或 false。保存不成功，返回带有错误信息，成功，则返回 false
+ */
+function field_save(&$field) {
+  if (is_object($field)) {
+    module_include_file('field.admin.inc', 'field');
+    module_include_file('field/admin.inc');
+    return _field_save($field);
+  }
+}
+
+/**
+ * 加载字段数据
+ * @param (int) $field_id
+ *  字段 id
+ * @param (bool) $clear
+ *  默认从缓存中读取，若传递 true，则读取数据库，并调用 hook_field_call_load()
+ */
+function field_load($field_id, $clear = NULL) {
+  static $fields;
+  if (!isset($fields[$field_id])) {
+    $fields[$field_id] = field_get_cache_field($field_id, $clear);
+  }
+  return $fields[$field_id];
+}
+
+// public field_groups($module, $type) {{{ 
+/**
+ * field_groups
+ * 字段输出分组管理
+ * 
+ * @param string $module 
+ * @param string $type 
+ * @access public
+ * @return array
+ */
+function field_groups($module, $type) {
+  module_include_file('field.admin.inc', 'field');
+  module_include_file('field/admin.inc');
+  return _field_groups($module, $type);
+}
+// }}}
+
+/**
+ * 导出字段配置。可按单个、单个、模块、一组导出
+ * @param (int or array) $field_id
+ *  单个 或一组字段 id
+ * @param $module
+ *  模块名称
+ * @param $type
+ *  字段组名字
+ */
+function field_export($field_id = NULL, $module = NULL, $type = NULL) {
+  module_include_file('field.admin.inc', 'field');
+  module_include_file('field/admin.inc');
+  return _field_export($field_id, $module, $type);
+}
+
+/**
+ * 删除字段
+ * 触发 hook_field_call_delete()
+ */
+function field_delete($field) {
+  module_include_file('field.admin.inc', 'field');
+  module_include_file('field/admin.inc');
+  if (!empty($field->deleted)) {
+    if (db_exec('DELETE FROM {fields} WHERE field_id = ?', array($field->field_id))) {
+      module_invoke_all('field_call_delete', $field);
+      dd_set_message(t('field', '!name 删除成功', array('!name' => $field->name)));
+      field_get_cache_field(NULL, 1); // 更新缓存
+      return true;
+    } else {
+      dd_set_message(t('field', '!name 删除失败', array('!name' => $field->name)), 'error');
+    }
+  } else {
+    dd_set_message(t('field', '这个字段不允许删除'), 'error');
+  }
+}
+
+/**
+ * 输出字段管理界面。默认获取全部，也可按模块、按分组获取
+ * 函数将占用以 field_ 开头的 _GET、_POST 参数，以便于将基本操作集中
+ * 调用本函数的模块，应避免在相同页面使用上述参数
+ * 默认提供删除、编辑操作，提供一个路径用做自定义界面
+ * $_GET['field_op'] == 'custom' 时，将调用 {module}_field_call_custom()
+ * @param string $module
+ *  模块系统名称
+ * @param string $type
+ *  字段分组名称
+ * @param array $filter_header
+ *  设置需要输出的 table 表头，如：array('name', 'weight'), 若为空，则输出全部
+ */
+function field_lists($module = NULL, $type = NULL, $filter_header = array()) {
+  module_include_file('field.admin.inc', 'field');
+  module_include_file('field/admin.inc');
+  return _field_lists($module, $type, $filter_header);
+}
+
+/**
+ * 删除组下所有字段，不验证字段删除权限，一般用于模块卸载 
+ * @param string $module 
+ *  模块名称
+ * @param string $type 
+ *  组名称
+ * @access public
+ * @return bool
+ */
+function field_group_delete($module, $type) {
+  if ($fields = field_get_cache_field_group($module, $type)) {
+    foreach ($fields as $field) {
+      // 一律视为允许删除
+      $field->deleted = 1;
+      field_delete($field);
+    }
+    return true;
+  }
+}
+
+/**
+ * @示例 hook_field_call_group()
+ *  创建模块字段组参数。字段创建是开放的，模块可以允许使用者自行创建字段
+ *  hook_field_call_group() 用来设置创建字段的规范或限制
+ *  每个模块创建的字段应该有不同的标识，对应于 fields 表中的 type 字段，而 module 字段则是模块名称
+ *  type 相当于组，一个组中可以有多个字段。比如：
+ *  模块可以设置一个 comment_field 组，在这个组下创建多个评论字段，再创建一个 user_field 组，用以创建用户字段
+ *  type 只能以英文、数字和下划线命名，且在相同模块中不能重复
+ * @return
+ *  返回以 type 为键名的数组
+ */
+
+/**
+function field_field_call_group($type = NULL) {
+  $groups = array(
+    'comment_field' => array(
+    	'title' => '评论字段', // 组名称。如资讯分类、评论字段等
+      'sum' => 0, // 该组下允许添加的字段数量，0 则为不限制
+      'term' => 1, // 只允许添加传统型分类，即 标签、下拉框、单选、复选
+      'type' => array('tags'), // 允许的类型，优先级高于 term
+    	'level' => 0, // 分类层级级数，0 则为不限制(实际最多 10 级)。标签、单\多行文本、文件只有 1 层
+      'fieldset' => false,
+      'description' => '描述', // 描述
+    )
+  );
+  return $type ? $groups[$type] : $groups;
+}
+ */
+
+/**
+ * 写入分类缓存，按字段分组信息
+ */
+function field_set_cache_term($module = NULL, $type = NULL) {
+  // 清除树状缓存
+  cache_del('*', 'field_cache_options');
+
+  if ($module && $type) {
+    $fetch = db_query('SELECT t.*, f.module, f.type, f.field_type, f.field_key FROM {fields_term} 
+    t INNER JOIN {fields} f ON t.field_id = f.field_id WHERE f.type = ? AND f.module = ? AND 
+    f.field_type != ? ORDER BY t.weight ASC, t.tid ASC', array($type, $module, 'tags'));
+    cache_set('field_term_' . $module . '_' . $type, array());
+  } else {
+    $fetch = db_query('SELECT t.*, f.module, f.type, f.field_type, f.field_key FROM {fields_term} 
+    t INNER JOIN {fields} f ON t.field_id = f.field_id WHERE f.field_type != ? 
+    ORDER BY t.weight ASC, t.tid ASC', array('tags'));
+  }
+  
+  if ($fetch) {
+    global $conf;
+    $conf['field_term_children'] = array();
+    foreach ($fetch as $o) {
+      if ($o->pid && ($o->field_type == 'select' || $o->field_type == 'selects')) {
+        $conf['field_term_children'][$o->field_id] = 1;
+        $children = 1;
+        continue;
+      }
+      $key = $o->module . '_' . $o->type;
+      $p[$key][$o->field_id][$o->tid] = $o;
+    }
+
+    foreach ($p as $k => $data) {
+      cache_set('field_term_' . $k, $data);
+    }
+    
+    // 删除每个字段单独的缓存
+    cache_del('*', 'field_term_key_cache_');
+
+    cache_del('*', 'field_term_all');
+    
+    if ($children) {
+      var_set('field_term_children', $conf['field_term_children']);
+    }
+    return $p;
+  }
+}
+
+/**
+ * 按字段组获取分类缓存，标签除外
+ */
+function field_get_cache_term($module, $type) {
+  static $term;
+  $key = 'field_term_' . $module . '_' . $type;
+  if (!isset($term[$key])) {
+    $term[$key] = array();
+    if ($cache = cache_get($key)) {
+      $term[$key] = $cache->data;
+    } else if ($data = field_set_cache_term($module, $type)) {
+      $term[$key] = $data[$module . '_' . $type];
+    }
+  }
+  return $term[$key];
+}
+
+/**
+ * 获取指定 key 的分类缓存数据
+ */
+function field_get_cache_term_key($module, $type, $field_key) {
+  static $term;
+  $key = 'field_term_key_cache_' . $module . '_' . $type . '_' . $field_key;
+  
+  if (!isset($term[$key])) {
+    $term[$key] = array();
+    if ($cache = cache_get($key)) {
+      $term[$key] = $cache->data;
+    } else if ($field = field_get_cache_field_key($module, $type, $field_key)) {
+      $term[$key] = field_get_cache_term_id($field->field_id);
+      cache_set($key, $term[$key]);
+    }
+  }
+  
+  return $term[$key];
+}
+
+/**
+ * 获取指定 field_id 的所有分类数据
+ */
+function field_get_cache_term_id($field_id) {
+  static $term;
+
+  if (!isset($term[$field_id])) {
+    
+    $term[$field_id] = array();
+    if ($cache = cache_get('field_term_all_' . $field_id)) {
+      $term[$field_id] = $cache->data;
+    } else if ($fetch = db_query('SELECT t.*, f.module, f.type, f.field_type, f.field_key FROM {fields_term} 
+    t INNER JOIN {fields} f ON t.field_id = f.field_id WHERE f.field_id = ? 
+    ORDER BY t.weight ASC, t.tid ASC', array($field_id))) {
+      foreach ($fetch as $o) {
+        $term[$field_id][$o->tid] = $o;
+      }
+      cache_set('field_term_all_' . $field_id, $term[$field_id]);
+    }
+    
+  }
+  
+  return $term[$field_id];
+}
+
+/**
+ * 获取（清除）所有字段缓存数据
+ */
+function field_get_cache_field($field_id = NULL, $clear = 0) {
+  if ($clear || ($data = var_get('field_data', false)) === false) {
+    $data = array();
+    if ($fetch = db_query('SELECT * FROM {fields} ORDER BY weight ASC, field_id ASC')) {
+      $lists = field_get_call_lists();
+      foreach ($fetch as $o) {
+        $group = module_invoke($o->module, 'field_call_group', $o->type);
+        
+        $field_count[$o->module.$o->type] = 1;
+        
+        if (!$group['not_cache']) {
+          if ($o->access) $o->access = unserialize($o->access);
+          if ($o->data) $o->data = unserialize($o->data);
+          $o->field_module = $lists[$o->field_type]['module'];
+          module_include_file('field/admin.inc');
+          module_alter_all('field_call_load', $o);
+          $data[$o->field_id] = $o;
+        } else {
+          $data[$o->field_id]->not_cache = true;
+        }
+      }
+    }
+    var_set('field_data', $data);
+    var_set('field_count', $field_count);
+    cache_del('*', 'field_term_all');
+  }
+  
+  if ($field_id && $data[$field_id] && $data[$field_id]->not_cache) {
+    if ($o = db_query('SELECT * FROM {fields} WHERE field_id = ?', array($field_id), array('return' => 'one'))) {
+      $o->not_cache = true;
+      if ($o->access) $o->access = unserialize($o->access);
+      if ($o->data) $o->data = unserialize($o->data);
+      $o->field_module = $data[$field_id]->field_module;
+      module_alter_all('field_call_load', $o);
+      $data[$o->field_id] = $o;
+    }
+  }
+  
+  return $field_id ? $data[$field_id] : $data;
+}
+
+/**
+ * 直接从数据库读取字段
+ * @param (string) $module
+ *  模块名称
+ * @param (string) $type
+ *  类型标识
+ */
+function field_get_data_field($module, $type) {
+  static $datas;
+
+  if (!isset($datas[$module][$type])) {
+    $datas[$module][$type] = array();
+    if ($fetch = db_query('SELECT * FROM {fields} WHERE module = ? AND type = ? ORDER BY weight ASC, field_id ASC',
+    array($module, $type))) {
+      $lists = field_get_call_lists();
+      foreach ($fetch as $o) {
+        if ($o->access) $o->access = unserialize($o->access);
+        if ($o->data) $o->data = unserialize($o->data);
+        $o->field_module = $lists[$o->field_type]['module'];
+        module_alter_all('field_call_load', $o);
+        $datas[$module][$type][$o->field_id] = $o;
+      }
+    }
+  }
+
+  return $datas[$module][$type];
+}
+
+/**
+ * 按模块和类型获取字段缓存数据
+ * @param (string) $module
+ *  fields 表中 module 字段
+ * @param (string) $type
+ *  fields 表中 type 字段
+ * @param (bool) $clear
+ *  true 则清空数据，重新生成缓存
+ */
+function field_get_cache_field_group($module, $type = NULL, $clear = 0) {
+  $group = module_invoke($module, 'field_call_group', $type);
+
+  if (!$group['not_cache']) {
+    if ($fields = field_get_cache_field(NULL, $clear)) {
+      foreach ($fields as $field) {
+        $data[$field->module][$field->type][$field->field_id] = $field;
+      }
+    }
+  } else if ($fields = field_get_data_field($module, $type)) {
+    foreach ($fields as $field) {
+      $data[$field->module][$field->type][$field->field_id] = $field;
+    }
+  }
+  
+  if ($data && $data[$module]) {
+    if ($type) {
+      return $data[$module][$type];
+    } else {
+      return $data[$module];
+    }
+  }
+}
+
+/**
+ * 按索引获取字段
+ */
+function field_get_cache_field_key($module, $type, $field_key) {
+  if ($fields = field_get_cache_field_group($module, $type)) {
+    foreach ($fields as $field) {
+      if ($field_key == $field->field_key) {
+        return $field;
+      }
+    }
+  }
+}
+
+/**
+ * 按 field_id 获取字段
+ * @param string $module 
+ * @param string $type 
+ * @param int $field_id 
+ * @access public
+ * @return object
+ */
+function field_get_cache_field_id($module, $type, $field_id) {
+  if ($fields = field_get_cache_field_group($module, $type)) {
+    return $fields[$field_id];
+  }
+}
+
+/**
+ * 以下相关函数是字段在节点中的应用接口
+ * 节点可以是任何对象，通过字段组名让字段与其关联，调用相应接口进行操作
+ * 如用户提交、更新、删除节点，同时也将操作关联的字段，以 field_node_ 为前缀
+ * 接口：
+ * 获取字段组表单：hook_field_node_form()
+ * 验证用户输入：hook_field_node_validate()
+ * 保存：hook_field_node_save()
+ * 删除：hook_field_node_delete()
+ * 浏览：hook_field_node_view() - 仅回调定义字段类型的模块
+ * 加载：hook_field_node_load() - 仅回调定义字段类型的模块
+ */
+
+/**
+ * @Implement of hook_file_delete()
+ */
+function field_file_delete($file) {
+  if ($file->ext_type == 'field_file') {
+    if ($o = db_query('SELECT * FROM {fields} WHERE field_id = ?',
+      array($file->ext_id), array('return' => 'one'))) {
+      cache_del('cid', $o->module.$o->type.$file->ext_id2, 'cache_field');
+      module_invoke_all('field_file_delete', $o, $file);
+    }
+  }
+}
+
+/**
+ * 加载节点下的字段数据
+ * @param (string) $module
+ *  创建字段的模块，即 fields.module
+ * @param (string) $type
+ *  自定义分组标识，即 fields.type
+ * @param (object) $node
+ *  节点对象
+ * @param (object) $ac
+ *  指定用户对象，默认以当前用户权限判断
+ * @return (void) 字段数据赋于 $node->fields
+ */
+function field_get_node_load($module, $type, & $node, $ac = NULL, $clear = NULL) {
+  global $conf;
+  
+  if (empty($conf['field_count'][$module . $type])) return;
+  
+  if (!$datas = field_get_cache_field_group($module, $type)) return;
+
+  if (!$clear && $cache = cache_get($module . $type . $node->nid, 'cache_field')) {
+    if (is_array($cache->data)) {
+      foreach ($datas as $field) {
+        if (isset($cache->data[$field->field_key]) && !field_access('view', $field, $node, $ac)) {
+          unset($cache->data[$field->field_key]);
+        }
+      }
+
+      if (!empty($node->fields) && is_array($node->fields)) {
+        $node->fields += $cache->data;
+      } else {
+        $node->fields = $cache->data;
+      }
+    }
+    return;
+  }
+
+  module_include_file('field/load.inc');
+  
+  foreach ($datas as $field_id => $field) {
+    /**
+     * 不同字段类型的数据存储方式不同，由定义类型的模块自行处理
+     * 读取后，附加到 $node->fields 中，必须以 $field->field_key 做为键名，避免冲突
+     * 如：$node->fields['username'] = array('xxx', 'ttt');
+     */
+
+    if (!$field->field_func) {
+      $function = $field->field_module . '_' . $field->field_type . '_field_node_load';
+      if (function_exists($function)) $function($field, $node, $ac);
+    } else {
+      $function = $field->field_func;
+      $function('load', $field, $node, $ac);
+    }
+
+    // 触发 hook_field_node_load()
+    module_alter_all('field_node_load', $field, $node, $ac);
+  }
+
+  cache_set($module . $type . $node->nid, $node->fields, 'cache_field');
+}
+
+/**
+ * 分类表单选择项
+ */
+function field_get_term_options($terms = array(), $required = 0) {
+  $options = array();
+  if (!$required) $options = array("" => t('field', '不限'));
+  if ($terms) {
+    foreach ($terms as $term) {
+      $options[$term->tid] = $term->name;
+    }
+  }
+  return $options;
+}
+
+/**
+ * 获取分类子级，用于级联表单 
+ * @param int $tid 
+ * @access protected
+ * @return array
+ */
+function _field_get_form_term_childrens($tid) {
+  if ($o = db_query('SELECT pid, tid FROM {fields_term} WHERE tid = ?', array($tid), array('return' => 'one'))) {
+    if ($o->pid) {
+      if ($fetch = db_query('SELECT pid, tid, name FROM {fields_term} WHERE pid = ?', array($o->pid))) {
+        $options = array();
+        foreach ($fetch as $term) {
+          $options[$term->tid] = $term->name;
+        }
+        $childrens[] = array('option' => $options, 'value' => $tid);
+        if ($parent = _field_get_form_term_childrens($o->pid, $term)) {
+          $childrens = array_merge($childrens, $parent);
+        }
+      }
+    } else {
+      $childrens[] = $o->tid;
+    }
+  }
+  return $childrens;
+}
+
+/**
+ * 获取指定 tid 的所有子级
+ * @param int $tid 
+ *  指定的 tid
+ * @param array $term 
+ *  从指定的数据中查找，该数组应使用 tid 为键名，通常可使用 field_get_cache_term_key() 获取。反之则从数据库中查找
+ * @access public
+ * @return void
+ */
+function field_get_term_childrens($tid, $term = NULL, &$childrens = array()) {
+  if (empty($term)) {
+    if ($fetch = db_query('SELECT pid, tid, name FROM {fields_term} WHERE pid = ?', array($tid))) {
+      foreach ($fetch as $o) {
+        $childrens[$o->tid] = $o->name;
+        field_get_term_childrens($o->tid, 0, $childrens);
+      }
+    }
+  } else {
+    foreach ($term as $o) {
+      if ($o->pid == $tid) {
+        $childrens[$o->tid] = $o->name;
+        field_get_term_childrens($o->tid, $term, $childrens);
+      }
+    }
+  }
+}
+
+// public field_get_node_form($module, $type, $node = NULL, &$form = NULL, $fieldset = NULL, $ac = NULL) {{{ 
+/**
+ * field_get_node_form
+ *  按字段组回调字段表单
+ * @param string $module 
+ *  模块名称，字段组所属模块，对应 fields 表中 module
+ * @param string $type 
+ *  字段组系统名称，对应 fields 表中 type
+ * @param object $node 
+ *  节点对象，字段是不能独立存在的，必须依附于某一个对象（如一篇文章）。如新建文章，可留空，编辑文章，传递文章对象
+ * @param array &$form 
+ *  节点表单数组，必须，本接口通过内部解析后，会将字段附加到该表单数组中
+ * @param bool|array $fieldset 
+ *  是否将字段组包裹中 fieldset 中，可留空，可以数组形式设置 fieldset 参数
+ * @param object $ac 
+ *  使用该表单的用户，留空则默认为当前用户，将用做判断字段使用权限，建议留空
+ * @access public
+ * @return void
+ */
+function field_get_node_form($module, $type, $node = NULL, &$form = NULL, $fieldset = NULL, $ac = NULL) {
+  if (!$group = module_invoke($module, 'field_call_group', $type)) {
+    dd_set_message(t('field', '未定义的字段组'), 'error');
+    return;
+  }
+  
+  if (!$datas = field_get_cache_field_group($module, $type)) return;
+  
+  if ($fieldset) {
+    $form['fields']['fields'] = array(
+      '#weight' => -3,
+      '#fieldset_prefix' => 'asc',
+      '#fieldset_legend' => t('field', '字段'),
+      '#fieldset_suffix' => 1,
+      '#fieldset' => true
+    );
+    if (is_array($fieldset)) {
+      $form['fields']['fields'] = array_merge($form['fields']['fields'], $fieldset);
+    }
+  } else {
+    $form['fields']['fields']['#weight'] = -3;
+  }
+
+  if (empty($form['groups'])) {
+    $form['groups'] = array();
+  }
+  
+  if ($groups = custom_get('field_groups_' . $module . $type)) {
+    foreach ($groups as $key => $info) {
+      if (empty($info['legend'])) continue;
+      $form['groups'][$key] = array(
+        '#fieldset' => 1,
+        '#fieldset_legend' => $info['legend'],
+        '#fieldset_prefix' => !empty($info['prefix']) ? $info['prefix'] : 'asc',
+        '#fieldset_suffix' => 1
+      );
+    }
+  }
+
+  dd_add_js('modules/field/field.js');
+  
+  // 加载所有模块目录下 field/form.inc 文件，可将 {$field_module}_{$field_type}_field_node_form() 函数定义在该文件中
+  module_include_file('field/form.inc');
+  
+  foreach ($datas as $field_id => $field) {
+    // 验证是否有字段更新权限
+    if (!field_access('update', $field, $node, $ac)) {
+      continue;
+    }
+
+    if (!$field->field_func) {
+      /**
+       * 没有自定义处理函数的字段类型，默认调用 模块名_字段类型_call_form()
+       */
+      $function = $field->field_module . '_' . $field->field_type . '_field_node_form';
+      if (function_exists($function)) $function($field, $node, $form, $ac);
+    } else {
+      /**
+       * 自定义处理函数即 fields 数据表中 field_func 字段
+       * 传递操作参数 load，传递字段配置对象，引用传递节点对象
+       * 操作参数：
+       *  load：节点加载
+       *  form：节点表单
+       *  insert：写入节点
+       *  delete：删除节点
+       *  update：更新节点
+       */
+      $function = $field->field_func;
+      $function('form', $field, $node, $form, $ac);
+    }
+
+    // 触发 hook_field_node_form()，可通过该 hook，对表单字段进行处理 
+    module_alter_all('field_node_form', $field, $node, $form, $ac);
+  }
+}
+// }}}
+
+/**
+ * 获取多级字段联动表单
+ * @param (object) $field
+ *  字段对象
+ * @param (*) $value
+ *  默认值
+ * @param (array) $form
+ *  表单值
+ */
+function field_get_multi_level_field($field, $value, &$form = NULL) {
+  if (!$field->field_id) return;
+  
+  dd_add_js('modules/field/field.js');
+  global $conf;
+
+  $options = field_get_cache_term($field->module, $field->type);
+  
+  switch ($field->field_type) {
+    case 'select':
+      if ($conf['field_term_children'][$field->field_id]) {
+        dd_add_js(array('fields' => array(
+          $field->field_key => array(
+            'url' => url('ajax', array('query' => 'fid='.$field->field_id.'&op=select&module=field'))
+          )
+        )), 'setting');
+        $form['fields']['fields']['field_root_'.$field->field_key] = array(
+          '#title' => $field->name,
+          '#type' => 'select',
+          '#required' => $field->required,
+          '#attributes' => array(
+            'class' => 'field_option_children field_option_children_'.$field->field_key,
+            'alt' => $field->field_key
+          ),
+          '#options' => field_get_term_options($options[$field->field_id]),
+          '#description' => $field->data['description']
+        );
+        
+        $default_value = NULL;
+        if ($_POST['fields'][$field->field_key]) {
+          $default_value = $_POST['fields'][$field->field_key];
+        } else if ($value) {
+          $default_value = $value;
+        }
+        
+        if ($default_value && $terms = _field_get_form_term_childrens($default_value)) {
+          static $ajaxId;
+          $ajaxId = 0;
+          $terms = array_reverse($terms);
+          $form['fields']['fields']['field_root_'.$field->field_key]['#prefix'] = '<div class="form_item form_item_select" id="form_field_root_'.$field->field_key.'">';
+          $form['fields']['fields']['field_root_'.$field->field_key]['#default_value'] = array_shift($terms);
+          $form['fields']['fields']['field_root_'.$field->field_key]['#description'] = '';
+          foreach ($terms as $children) {
+            ++$ajaxId;
+            $form['fields']['fields']['_field_root_'.$field->field_key.$ajaxId] = array(
+              '#type' => 'select',
+              '#attributes' => array(
+                'class' => 'field_option_children',
+                'alt' => $field->field_key
+              ),
+              '#suffix' => '',
+              '#default_value' => $children['value'],
+              '#options' => $children['option'],
+            );
+          }
+          $form['fields']['fields']['_field_root_'.$field->field_key.$ajaxId]['#suffix'] = '</div>';
+          $form['fields']['fields']['_field_root_'.$field->field_key.$ajaxId]['#description'] = $field->data['description'];
+        }
+        $form['fields']['fields'][$field->field_key] = array(
+          '#type' => 'hidden',
+          '#default_value' => $default_value,
+          '#required' => $required,
+          '#attributes' => array(
+            'class' => 'field_select_value field_select_value_'.$field->field_key,
+            'alt' => $field->field_key
+          )
+        );
+      } else {
+        $form['fields']['fields'][$field->field_key] = array(
+          '#title' => $field->name,
+          '#type' => 'select',
+          '#default_value' => $value,
+          '#required' => $required,
+          '#options' => field_get_term_options($options[$field->field_id], $required),
+          '#description' => $field->data['description']
+        );
+      }
+    break;
+    case 'selects':
+      if ($conf['field_term_children'][$field->field_id]) {
+        dd_add_js(array('fields' => array(
+          $field->field_key => array(
+            'url' => url('ajax', array('query' => 'fid='.$field->field_id.'&op=select&module=field'))
+          )
+        )), 'setting');
+        $form['fields']['fields']['field_root_'.$field->field_key] = array(
+          '#title' => $field->name,
+          '#type' => 'select',
+          '#required' => $node->fields[$field->field_key] ? false : $required,
+          '#attributes' => array(
+            'class' => 'field_option_children field_option_children_'.$field->field_key,
+            'alt' => $field->field_key
+          ),
+          '#prefix' => '<div class="form_item form_item_select form_item_selects" id="user_edit_form_field_field_root_'.$field->field_key.'">',
+          '#field_suffix' => '<input type="button" value="'.t('field', '增加').'" class="form_select_multiple_button" alt="'.$field->field_key.'" />',
+          '#options' => field_get_term_options($options[$field->field_id]),
+          '#description' => $field->data['description']
+        );
+        
+        $defaults = NULL;
+        if ($_POST['fields'][$field->field_key]) {
+          $defaults = $_POST['fields'][$field->field_key];
+        } else if ($value) {
+          foreach ($value as $de) {
+            $defaults[$de->tid] = $de->tid;
+          }
+        }
+        
+        $description = '';
+        
+        if ($defaults) {
+          foreach ($defaults as $default_value) {
+            $form['fields']['fields'][$field->field_key][$default_value] = array(
+              '#type' => 'hidden',
+              '#default_value' => $default_value,
+              '#attributes' => array('class' => 'field_form_selects_option_'.$default_value)
+            );
+            if ($node->fields[$field->field_key]) {
+              $description .= '<span>'.$node->fields[$field->field_key][$default_value]->name;
+              $description .= '<a href="javascript:void(0);" alt="'.$default_value.'" onClick="fields.deleteOption($(this));">('.t('field', '移除').')</a></span>';
+            }
+          }
+        }
+        
+        $form['fields']['fields']['field_root_'.$field->field_key]['#description'] = $field->data['description'] . '<div class="field_form_selects_view">'.$description.'</div>';
+        $form['fields']['fields']['_multiple_'.$field->field_key] = array(
+          '#type' => 'hidden',
+          '#default_value' => $node->fields[$field->field_key] ? 0 : "",
+          '#required' => $required,
+          '#attributes' => array(
+            'class' => 'field_select_value field_select_value_'.$field->field_key,
+            'alt' => $field->field_key
+          ),
+          '#suffix' => '</div>'
+        );
+      } else {
+        $defaults = NULL;
+        if ($value) {
+          foreach ($value as $de) {
+            $defaults[$de->tid] = $de->tid;
+          }
+        }
+        $form['fields']['fields'][$field->field_key] = array(
+          '#title' => $field->name,
+          '#type' => 'selects',
+          '#default_value' => $defaults,
+          '#required' => $required,
+          '#options' => field_get_term_options($options[$field->field_id], 1),
+          '#description' => $field->data['description']
+        );
+      }
+    break;
+  }
+  return $form['fields'];
+}
+
+/**
+ * 节点回调字段验证
+ */
+function field_get_node_validate($module, $type, $value, $node = NULL, &$form = NULL) {
+  if (!$group = module_invoke($module, 'field_call_group', $type)) {
+    return;
+  }
+  
+  if (!$datas = field_get_cache_field_group($module, $type)) return;
+  
+  $error = NULL;
+  
+  module_include_file('field/validate.inc');
+  
+  foreach ($datas as $field_id => $field) {
+    if (!$field->field_func) {
+      $function = $field->field_module . '_' . $field->field_type . '_field_node_validate';
+      if (function_exists($function)) $function($field, $value, $error, $form, $ac);
+    } else {
+      $function = $field->field_func;
+      $function('validate', $field, $value, $error, $form, $ac);
+    }
+    module_alter_all('field_node_validate', $field, $value, $error, $form, $ac);
+  }
+  
+  return $error;
+}
+
+// public field_get_node_html($module, $type, &$node) {{{ 
+/**
+ * field_get_node_html
+ * 获取字段组内所有字段并解析为 html，必须先调用 field_get_node_view()  生成数据
+ * @param string $module 
+ *  定义字段组的模块名称
+ * @param string $type 
+ *  字段组名，若节点下有多个字段组，且合并输出，不要传递此值
+ * @param object $node 
+ *  节点对象
+ * @access public
+ * @return string
+ */
+function field_get_node_html($module, $node, $type = NULL) {
+  if (empty($node->field_view)) return false;
+  
+  return theme('fields', $module, $node, $type);
+}
+// }}}
+
+/**
+ * 节点回调显示，将验证当前用户是否有权限浏览器该字段内容
+ * @param string $module
+ *  模块名称
+ * @param string $type
+ *  字段组名
+ * @param object $node
+ *  节点对象
+ * @param (int) $type
+ *  显示方式：
+ *    0：按类型分组，如 $node->field_view['tags'][$data->field_key]
+ *    1、按 field_key 分组，如 $node->field_view[$data->field_key]，注意：若节点下有两个字段组，可能存在相同 field_key
+ *    2、按 field_id 分组，可避免节点下有两个字段组 key 重复产生的冲突
+ */
+function field_get_node_view($module, $type, &$node, $view_type = 0) {
+  if (!$datas = field_get_cache_field_group($module, $type)) return;
+
+  module_include_file('field/view.inc');
+  
+  foreach ($datas as $field_id => $field) {
+    if (!isset($node->fields[$field->field_key])) continue;
+
+    if (!field_access('view', $field, $node)) continue;
+
+    $content = array();
+
+    if (empty($field->field_func)) {
+      $function = $field->field_module . '_' . $field->field_type . '_field_node_view';
+      if (function_exists($function)) $content = $function($field, $node, $view_type);
+    } else {
+      $function = $field->field_func;
+      $content = $function('view', $field, $node, $view_type);
+    }
+
+    module_alter_all('field_node_view', $field, $node, $view_type, $content);
+
+    if (!empty($content)) {
+      if (empty($view_type)) {
+        $node->field_view[$content['#field_type']][$field->field_key] = $content;
+      } else if ($view_type == 1) {
+        $node->field_view[$field->field_key] = $content;
+      } else {
+        $node->field_view[$field->field_id] = $content;
+      }
+    }
+  }
+}
+
+/**
+ * 节点回调字段保存
+ * @param (string) $module
+ *  定义字段组的模块名称
+ * @param (string) $type
+ *  字段组标识，与 hook_field_call_group 中定义的一致
+ * @param (object) $value
+ *  待保存的数据，一般为用户提交的表单数据，必须有 $value->nid，以便于字段和节点关联
+ * @param (object) $node
+ *  旧的数据，如果是编辑节点，可以传递旧的节点数据
+ * @param (array) $form
+ *  表单
+ * @param (object) $ac
+ *  用户对象，默认以当前用户权限验证
+ * @return (void)
+ */
+function field_get_node_save($module, $type, $value, $node = NULL, $form = NULL, $ac = NULL) {
+  if (empty($value->nid)) return false;
+  
+  if (!$group = module_invoke($module, 'field_call_group', $type)) {
+    return;
+  }
+  
+  if (!$datas = field_get_cache_field_group($module, $type)) return false;
+
+  if (!isset($node)) {
+    $node = new stdClass();
+    $node->nid = $value->nid;
+    field_get_node_load($module, $type, $node, $ac);
+  }
+  
+  module_include_file('field/save.inc');
+  
+  foreach ($datas as $field_id => $field) {
+    // 验证是否有字段更新权限
+    if (!field_access('update', $field, $value, $ac)) {
+      continue;
+    }
+
+    if (!$field->field_func) {
+      $function = $field->field_module . '_' . $field->field_type . '_field_node_save';
+      if (function_exists($function)) $function($field, $value, $node, $form, $ac);
+    } else {
+      $function = $field->field_func;
+      $function('save', $field, $value, $node, $form, $ac);
+    }
+
+    // 触发 hook_field_node_save()
+    module_alter_all('field_node_save', $field, $node, $form, $ac);
+  }
+ 
+	cache_del('cid', $module . $type . $value->nid, 'cache_field');
+}
+
+/**
+ * 根据字段设置，获取文件上传验证参数
+ */
+function _field_get_file_validate($data, $value) {
+
+  $validate = array(
+    'ext_id' => $data->field_id, // 字段 id
+    'ext_id2' => $value->nid, // 节点 id
+    'ext_type' => 'field_file', // 扩展类型
+    'filetype' => $data->data['filetype'],
+    'savepath' => !empty($data->data['savepath']) ? dd_get_token($data->data['savepath'], $value) : '',
+    'filesize' => !empty($data->data['filesize']) ? $data->data['filesize'] : 999999,
+  );
+
+  if (!empty($data->data['filename'])) {
+    $validate['filename'] = dd_get_token($data->data['filename'], $value);
+  }
+
+  if (!empty($data->data['extension'])) {
+    $validate['extension'] = $data->data['extension'];
+  }
+
+  return $validate;
+}
+
+/**
+ * 删除节点下的字段数据，不验证权限，一般节点被删除，其所属字段也应被删除
+ * @param (string) $module
+ *  定义字段组的模块名称
+ * @param (string) $type
+ *  字段组标识，与 hook_field_call_group 中定义的一致
+ * @param (object) $node
+ *  节点对象，必须包含 $node->nid
+ */
+function field_get_node_delete($module, $type, $node) {
+  
+  if (empty($node->nid)) return;
+  
+  if (!$datas = field_get_cache_field_group($module, $type)) return;
+
+  module_include_file('field/delete.inc');
+  
+  foreach ($datas as $field_id => $field) {
+    if (!$field->field_func) {
+      $function = $field->field_module . '_' . $field->field_type . '_field_node_delete';
+      if (function_exists($function)) $content = $function($field, $node);
+    } else {
+      $function = $field->field_func;
+      $content = $function('delete', $field, $node);
+    }
+    module_alter_all('field_node_delete', $field, $node);
+  }
+
+  cache_del('cid', $module . $type . $node->nid, 'cache_field');
+
+}
+
+/**
+ * 字符串解析为标签，以,或，为分隔符，若字符串本身包含[,]与[，]，以[-] [--]代替
+ * @param string $text 
+ * @access public
+ * @return array
+ */
+function field_get_string_tags($text) {
+  static $tags;
+  
+  $key = md5($text);
+
+  if (!isset($tags[$key])) {
+    $text = str_replace('，', ',', $text);
+    if (strpos($text, ',') !== false) {
+      foreach (explode(',', $text) as $tag) {
+        if ($tag =  trim($tag)) {
+          $tags[$key][] = str_replace(array('[-]', '[--]'), array(',', '，'), $tag);
+        }
+      }
+      $tags[$key] = array_unique($tags[$key]);
+    } else if ($text = trim($text)) {
+      $tags[$key][] = str_replace(array('[-]', '[--]'), array(',', '，'), $text);
+    }
+  }
+
+  return $tags[$key];
+}
+
+/**
+ * @Implement of hook_system_cache_clear()
+ */
+function field_system_cache_clear($op = 'list', $v = NULL) {
+  switch ($op) {
+    case 'list':
+    return array(
+      'fields' => t('field', '清除字段缓存，当字段信息发生更改时应选择此项'),
+    );
+    case 'submit':
+      if ($v['value']['fields']) {
+        dd_set_message(t('field', '字段缓存清除成功'));
+        cache_del('empty', NULL, 'cache_field');
+        field_get_cache_field(NULL, 1);
+        field_set_cache_term();
+      }
+  }
+}
+
+/**
+ * @Implement of hook_token_replace()
+ */
+function field_token_replace($text, $value = NULL) {
+  
+  if (!is_object($value)) return $text;
+
+	$args = array(
+		'[field_nid]' => $value->nid,
+		'[field_uid]' => $value->uid,
+		'[field_created]' => $value->created,
+		'[field_updated]' => $value->updated,
+  );
+
+	return strtr($text, $args);
+}
+
+/**
+ * @Implement of hook_token_list()
+ */
+function field_token_list() {
+	return array(
+		'[field_uid]' => array(
+			'title' => t('field', '用户 id'),
+		),
+		'[field_nid]' => array(
+			'title' => t('field', '节点 id'),
+		),
+		'[field_created]' => array(
+			'title' => t('field', '节点添加时间'),
+		),
+		'[field_updated]' => array(
+			'title' => t('field', '节点更新时间'),
+		),
+	);
+}
+
+/**
+ * @Implement of hook_theme()
+ */
+function field_theme() {
+  return array(
+    'fields' => array(
+      'tpl' => 'fields.tpl.php',
+      'description' => '节点字段组输出模板',
+      /**
+       * 当节点有多个字段组时，可能合并输出，该种情况下， $type 为空
+       */
+      'args' => array('module', 'node', 'type'),
+    ),
+   'field_node_list' => array(
+      'tpl' => 'field_node_list.tpl.php',
+      'description' => '字段或类别所属节点列表浏览页模板',
+      /**
+       * $content 输出的内容
+       * $data $field 或 $term
+       * $type term (显示字段下某一类别) 或 field (显示字段下所有类别)
+       */
+      'args' => array('content', 'data', 'type'),
+    ),
+  );
+}
+
+/**
+ * @Implement of hook_template_preprocess_x()
+ * 
+ * 节点字段组输出模板：
+ * fields_{$module}_{$type}.tpl.php
+ * fields_{$module}.tpl.php
+ * fields.tpl.php
+ * 
+ */
+function field_template_preprocess_fields(&$var, $hook) {
+  if (!empty($var['module'])) {
+    if (!empty($var['type'])) {
+      $var['theme_config']->tpl[] = 'fields_' . $var['module'] . '_' . $var['type'] . '.tpl.php';
+    }
+    $var['theme_config']->tpl[] = 'fields_' . $var['module'] . '.tpl.php';
+  } 
+}
+
+/**
+ * @Implement of hook_template_preprocess_x()
+ * 
+ * 字段、类别列表页输出模板：
+ * field_node_list_{$field->module}_{$field->type}_{$field->field_key}.tpl.php
+ * field_node_list_{$field->module}_{$field->type}.tpl.php
+ * field_node_list_{$field->module}.tpl.php
+ * field_node_list.tpl.php
+ * 
+ */
+function field_template_preprocess_field_node_list(&$var, $hook) {
+  if ($var['type'] == 'term') {
+    $field = $var['data']->field;
+  } else {
+    $field = $var['data'];
+  }
+  if (!empty($field)) {
+    $var['theme_config']->tpl[] = 'field_node_list_' . $field->module . '_' . $field->type . '_' . $field->field_key . '.tpl.php';
+    $var['theme_config']->tpl[] = 'field_node_list_' . $field->module . '_' . $field->type . '.tpl.php';
+    $var['theme_config']->tpl[] = 'field_node_list_' . $field->module . '.tpl.php';
+    $var['field'] = $field;
+  }
+}
+
+
+/**
+ * @Implement of hook_init()
+ */
+function field_init() {
+  module_include_file('field.term.inc', 'field');
+}
+
+/**
+ * 验证日期和时间
+ * @param string $v
+ *  需要验证的字符串
+ * @param string $type
+ *  日期格式
+ * @param bool $time
+ *  是否有时间
+ * 仅验证格式，不验证数值是否正确，如：9999-99-99 99:99:99 也是合法的
+ * @returu bool|string
+ */
+function field_validate_date($v, $format, $time = NULL) {
+  if ($time) {
+    $msg = t('field', '日期格式不正确');
+    if (strpos($v, ' ') !== false && strpos($v, ':') !== false) {
+      if ($a = explode(' ', $v, 2)) {
+        if (preg_match('/\w\w:\w\w:\w\w$/', $a[1])) {
+           $msg = false;
+        }
+      }
+    }
+    $v = $a[0];
+  }
+ 
+  if ($msg) {
+    return $msg;
+  } else {
+    $msg = t('field', '日期格式不正确');
+  }
+ 
+  switch ($format) {
+    case 'yy-mm-dd':
+      if (strpos($v, '-') !== false && preg_match('/\w{4}-\w\w-\w\w$/', $v)) {
+        $msg = false;
+      }
+    break;
+    case 'mm/dd/yy':
+      if (strpos($v, '/') !== false && preg_match('/\w\w-\w\w-\w{4}$/', $v)) {
+        $msg = false;
+      }
+    break;
+  }
+ 
+  return $msg;
+}
+

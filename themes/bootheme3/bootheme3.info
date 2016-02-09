@@ -1,0 +1,23 @@
+<?php
+// $Id$
+$info = array(
+  'name' => 'bootstrap3',
+  'ver' => '1.0',
+  'language' => 'zh-hans',
+  'ui_theme' => 'bootstrap',
+  'description' => '本主题以 twitter bootstrap3 为基础，默认已加载全部css及js插件',
+  'preview_original' => 'images/preview_original.png',
+  'preview_thumb' => 'images/preview_thumb.png',
+  'region' => array(
+  	'left' => '左栏',
+  	'right' => '右栏',
+  	'bottom' => '底部',
+  ),
+  'styles' => array(
+    'css/style.css'
+  ),
+  'scripts' => array(
+    'scripts/scripts.js'
+  ),
+  'framework' => 'bootstrap3',
+);

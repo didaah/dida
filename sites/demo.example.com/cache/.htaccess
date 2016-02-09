@@ -1,0 +1,4 @@
+#禁止下载
+<FilesMatch "\.*$">
+  Order allow,deny
+</FilesMatch>

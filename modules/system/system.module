@@ -1,0 +1,2113 @@
+<?php
+// $Id$
+
+/**
+ * @file
+ *  系统核心模块。
+ */
+
+// 验证码类型
+define('DIDA_CAPTCHA_TYPE_INT', 1); // 纯数字
+define('DIDA_CAPTCHA_TYPE_CUSTOM', 2); // 自定义文本
+define('DIDA_CAPTCHA_TYPE_ZH', 2); // @TODO 汉字将取消，归类于自定义文本
+define('DIDA_CAPTCHA_TYPE_MATH', 3); // 四则混合运算
+define('DIDA_CAPTCHA_TYPE_ASK', 4); // 问答式
+
+/**
+ * @Implement of hook_menu
+ */
+function system_menu() {
+  $items = array();
+  $items['captcha'] = array(
+    'access_callback' => true,
+    'page_callback' => 'captcha_page',
+    'file' => 'system.captcha.inc'
+  );
+
+  $items['robots.txt'] = array(
+    'access_callback' => true,
+    'page_callback' => 'system_page_robots',
+    'file' => 'system.page.inc'
+  );
+  
+  $items['ajax'] = array(
+    'access_callback' => true,
+    'description' => '全局 ajax 地址',
+    'page_callback' => 'system_tools_ajax',
+    'file' => 'system.ajax.inc'
+  );
+
+  $items['g'] = array(
+    'access_callback' => true,
+    'description' => '全局重定向跳转地址',
+    'page_callback' => 'system_tools_go',
+  );
+
+  $items['admin'] = array(
+    'title' => '网站管理',
+    'access_arguments' => array('system view admin'),
+    'page_callback' => 'system_admin_default',
+    'file' => 'system.admin.inc'
+  );
+
+  $items['images/error'] = array(
+    'access_callback' => true,
+    'page_callback' => 'system_images_error',
+  );
+
+  $items['files/editor'] = array(
+    'access_arguments' => array('file upload'),
+    'page_callback' => 'system_file_upload',
+    'file' => 'system.file.inc',
+  );
+
+  $items['files/%/%'] = array(
+    'load_functions' => array(1 => array('file_load'), 2 => '%'),
+    'access_callback' => 'file_is_access',
+    'access_arguments' => array(1, 2),
+    'page_callback' => 'file_operate',
+    'page_arguments' => array(1, 2),
+  );
+
+  $items['admin/token'] = array(
+    'title' => '通配符',
+    'access_arguments' => array('system view admin'),
+    'page_callback' => 'system_admin_token',
+    'file' => 'system.admin.inc',
+  );
+
+  $items['admin/sql'] = array(
+    'title' => '执行 SQL',
+    'access_arguments' => array('system admin sql'),
+    'page_callback' => 'dd_get_form',
+    'page_arguments' => array('system_admin_sql'),
+    'file' => 'system.admin.inc',
+  );
+
+  $items['admin/modules'] = array(
+    'title' => '模块管理',
+    'access_arguments' => array('system admin module'),
+    'page_callback' => 'dd_get_form',
+    'page_arguments' => array('system_modules_page'),
+    'file' => 'system.module.inc',
+  );
+
+  $items['admin/site_menu'] = array(
+    'title' => '主导航',
+    'access_arguments' => array('system admin site menu'),
+    'page_callback' => 'system_admin_site_menu',
+    'file' => 'system.admin.inc',
+  );
+
+  $items['admin/front'] = array(
+    'title' => '首页设置',
+    'access_arguments' => array('system admin front'),
+    'page_callback' => 'dd_get_form',
+    'page_arguments' => array('system_admin_front'),
+    'file' => 'system.admin.inc',
+  );
+
+  $items['admin/logs'] = array(
+    'title' => '系统日志',
+    'access_arguments' => array('system admin logs'),
+    'page_callback' => 'system_admin_logs',
+    'file' => 'system.admin.inc',
+  );
+
+  $items['admin/themes'] = array(
+    'title' => '主题管理',
+    'access_arguments' => array('system admin theme'),
+    'page_callback' => 'dd_get_form',
+    'page_arguments' => array('system_themes_page'),
+    'file' => 'system.module.inc',
+  );
+  $items['admin/themes/admin'] = array(
+    'title' => '管理专用主题',
+    'access_arguments' => array('system admin theme'),
+    'page_callback' => 'dd_get_form',
+    'page_arguments' => array('system_themes_admin'),
+    'file' => 'system.module.inc',
+  );
+
+  $items['admin/themes/setting/%'] = array(
+    'load_functions' => array(3 => '%'),
+    'title' => '主题设置',
+    'access_arguments' => array('system admin theme'),
+    'page_callback' => 'dd_get_form',
+    'page_arguments' => array('system_themes_setting', 3),
+    'file' => 'system.module.inc',
+  );
+
+  $items['admin/status/update'] = array(
+    'access_arguments' => array('system view admin'),
+    'page_callback' => 'system_status_update',
+  );
+
+  $items['admin/status/php'] = array(
+    'access_arguments' => array('system view admin'),
+    'page_callback' => 'system_status_php',
+    'file' => 'system.admin.inc',
+  );
+
+  $items['admin/cache'] = array(
+    'title' => '缓存管理',
+    'access_arguments' => array('system admin cache'),
+    'page_callback' => 'dd_get_form',
+    'page_arguments' => array('system_cache_clear'),
+    'file' => 'system.admin.inc'
+  );
+
+  $items['admin/cache/settings'] = array(
+    'title' => '缓存设置',
+    'access_arguments' => array('system admin cache'),
+    'page_callback' => 'dd_get_form',
+    'page_arguments' => array('system_cache_settings'),
+    'file' => 'system.admin.inc'
+  );
+
+  $items['admin/lang'] = array(
+    'title' => '语言设置',
+    'access_arguments' => array('system admin lang'),
+    'page_callback' => 'system_admin_lang',
+    'file' => 'system.admin.inc'
+  );
+
+  $items['admin/filter'] = array(
+    'title' => '输入设置',
+    'access_arguments' => array('system admin filter'),
+    'page_callback' => 'system_admin_filter',
+    'file' => 'system.admin.inc'
+  );
+
+  $items['admin/format'] = array(
+    'title' => '过滤器列表',
+    'access_arguments' => array('system admin filter'),
+    'page_callback' => 'system_admin_format',
+    'file' => 'system.admin.inc'
+  );
+
+  $items['admin/alias'] = array(
+    'title' => '别名管理',
+    'access_arguments' => array('system admin alias'),
+    'page_callback' => 'system_admin_alias',
+    'file' => 'system.admin.inc'
+  );
+
+  $items['admin/settings'] = array(
+    'title' => '站点设置',
+    'access_arguments' => array('system admin settings'),
+    'page_callback' => 'dd_get_form',
+    'page_arguments' => array('system_site_settings'),
+    'file' => 'system.admin.inc'
+  );
+
+  $items['admin/settings/global'] = array(
+    'title' => '站点信息',
+    'access_arguments' => array('system admin settings global'),
+    'page_callback' => 'dd_get_form',
+    'page_arguments' => array('system_site_global'),
+    'file' => 'system.admin.inc'
+  );
+
+  $items['admin/settings/error'] = array(
+    'title' => '错误设置',
+    'access_arguments' => array('system admin settings error'),
+    'page_callback' => 'dd_get_form',
+    'page_arguments' => array('system_site_error'),
+    'file' => 'system.admin.inc'
+  );
+
+  /*
+  $items['admin/settings/cron'] = array(
+    'title' => '计划任务',
+    'access_arguments' => array('system admin cron'),
+    'page_callback' => 'system_admin_cron',
+    'file' => 'system.admin.inc'
+  );
+   */
+
+  $items['admin/settings/captcha'] = array(
+    'title' => '验证码设置',
+    'access_arguments' => array('system admin settings captcha'),
+    'page_callback' => 'dd_get_form',
+    'page_arguments' => array('system_site_captcha'),
+    'file' => 'system.admin.inc'
+  );
+
+  $items['admin/settings/captcha/custom'] = array(
+    'title' => '自定义验证码',
+    'access_arguments' => array('system admin settings captcha'),
+    'page_callback' => 'dd_get_form',
+    'page_arguments' => array('system_site_captcha_custom'),
+    'file' => 'system.admin.inc'
+  );
+
+  $items['admin/settings/robots'] = array(
+    'title' => 'robots 设置',
+    'access_arguments' => array('system admin settings robots'),
+    'page_callback' => 'dd_get_form',
+    'page_arguments' => array('system_admin_robots'),
+    'file' => 'system.admin.inc',
+  );
+
+  $items['admin/settings/files'] = array(
+    'title' => '文件设置',
+    'access_arguments' => array('system admin settings files'),
+    'page_callback' => 'dd_get_form',
+    'page_arguments' => array('system_site_files'),
+    'file' => 'system.admin.inc'
+  );
+
+  return $items;
+}
+
+/**
+ * @Implement of hook_perm()
+ */
+function system_perm() {
+  return array(
+    'system view admin' => t('system', '访问管理页面'),
+    'system admin module' => t('system', '模块管理'),
+    'system admin theme' => t('system', '主题管理'),
+    'system admin cache' => t('system', '缓存管理'),
+    'system admin site menu' => t('system', '主导航管理'),
+    'system admin front' => t('system', '首页设置'),
+    'system admin settings' => t('system', '站点设置'),
+    'system admin alias' => t('system', '别名管理'),
+    'system admin settings robots' => t('system', 'robots 设置'),
+    'system admin settings global' => t('system', '站点信息'),
+    'system admin settings error' => t('system', '错误设置'),
+    'system admin logs' => t('system', '系统日志'),
+    'system admin sql' => t('system', '执行 SQL(危险)'),
+    //'system admin cron' => t('system', '计划任务'),
+    'system admin settings captcha' => t('system', '验证码设置'),
+    'system admin settings files' => t('system', '文件设置'),
+    'system admin filter' => t('system', '输入法管理'),
+    'filter use php' => t('system', '使用 PHP 过滤器(危险)'),
+    'system admin lang' => t('system', '界面翻译'),
+    'system lang change' => t('system', '选择语言'),
+    'file upload' => t('system', '上传文件'),
+    'file all view' => t('system', '浏览所有文件'),
+    'file one view' => t('system', '浏览自己的文件'),
+    'file all delete' => t('system', '删除所有文件'),
+    'file one delete' => t('system', '删除自己的文件'),
+    'file all update' => t('system', '编辑所有文件'),
+    'file one update' => t('system', '编辑自己的文件'),
+  );
+}
+
+/**
+ * @Implement of hook_init()
+ */
+function system_init() {
+  global $is_admin, $_filter_is_php_code;
+
+  // 全局允许 php code 输入格式
+  $_filter_is_php_code = true;
+
+  system_is_admin();
+  
+  dd_add_js('modules/system/system.js');
+}
+
+/**
+ * 管理页面
+ */
+function system_is_admin() {
+  if (arg(0) != 'admin') {
+    return false;
+  }
+ 
+  global $user, $conf, $is_admin;
+
+  $is_admin = true; // 当前为管理页面
+
+  if ($conf['theme_admin'] && $conf['themes'][$conf['theme_admin']]) {
+    $conf['default_theme'] = $conf['theme_admin'];
+  }
+  
+  dd_add_js('modules/system/admin.js');
+  dd_jqui();
+}
+
+/**
+ * @Implement of hook_call_custom()
+ */
+function system_call_custom($v) {
+  switch ($v['op']) {
+    case 'image_error':
+      require_once './includes/file.inc';
+      require_once './includes/image.inc';
+      system_images_error();
+    break;
+    case 'cache_clear':
+      global $conf;
+      $conf['site_mode'] = 1; // 开发模式
+      dd_add_js('modules/system/system.js');
+      return theme('print', dd_get_form('_system_call_custom_form', 'cache_clear'));
+    break;
+    case 'install':
+      return theme('print', dd_get_form('_system_call_custom_form', 'install'));
+    break;
+    case 'first_cache':
+      global $conf;
+      $conf['site_mode'] = 1; // 开发模式
+      // 首次清除缓存、导入模块、主题相关数据，仅在超级管理员从未登录的情况适用
+      if (db_query('SELECT uid FROM {users} WHERE uid = 1 AND count < 1', 
+      NULL, array('return' => 'column'))) {
+        module_set_list('module', 'modules');
+        module_enabled_variable('module');
+        module_set_list('theme', 'themes');
+        module_enabled_variable('theme');
+        module_hook_set_cache();
+        theme_get_cache(); 
+        module_invoke_all('first_cache');
+      }
+    break;
+  }
+}
+
+function _system_call_custom_form($op) {
+  if ($op == 'cache_clear') {
+    require_once './modules/system/system.admin.inc';
+    $form['fields']['value'] = array(
+      '#type' => 'checkbox',
+      '#options' => module_invoke_all('system_cache_clear', 'list'),
+    );
+  }
+  
+  $form['fields']['op'] = array(
+    '#type' => 'hidden',
+    '#default_value' => $op,
+    '#constant' => 1
+  );
+  
+  $form['fields']['name'] = array(
+    '#title' => t('system', '昵称'),
+    '#type' => 'textfield',
+    '#required' => 1,
+  );
+  $form['fields']['pass'] = array(
+    '#title' => t('system', '密码'),
+    '#type' => 'password',
+    '#required' => 1,
+  );
+  $form['fields']['button'] = array(
+    '#type' => 'submit',
+    '#value' => t('system', '验证密码以执行操作')
+  );
+  
+  if ($op == 'cache_clear') {
+    $form['fields']['button']['#field_prefix'] = form_util_all_check(array('alt' => '_system_call_custom_cache_clear_type_value'));
+  }
+  
+  $form['settings'] = array(
+    '#ajax_validate' => 1,
+    '#validate' => array('_system_call_custom_form_validate')
+  );
+  return $form;
+} 
+
+function _system_call_custom_form_validate(&$form, &$v) {
+  if ($GLOBALS['free_update'] !== true) {
+    if ($ac = user_is_login_pass(array('name' => $v['name']), $v['pass'])) {
+      if ($ac->uid != 1) {
+        $t['name']['#error'][] = t('system', '你没有权限使用此功能');
+      }
+    } else {
+      $t['name']['#error'][] = t('system', '帐号和密码不匹配');
+    }
+  }
+  
+  if (empty($t)) {
+    if ($v['op'] == 'cache_clear') {
+      system_cache_clear_submit($form, $v);
+    } else if ($v['op'] == 'install') {
+      // 升级模块
+      global $conf;
+      $modules = array_keys($conf['modules']);
+      
+      $query = module_set_enabled('enabled', 'module', $modules);
+      
+      if (!empty($query) && is_array($query)) {
+        dd_set_message('升级成功，升级中执行了以下 sql：<br>' .implode('<br>', $query));
+      } else {
+        dd_set_message(t('system', '没有模块需要升级'));
+      }
+      
+      dd_goto(NULL);
+    }
+  }
+  
+  return $t;
+}
+
+/**
+ * image_get_thumb() 获取缩略图路径，若不存在，则生成缩略图。
+ * 若原图不存在，则返回 imgaes/error?size={$widthx$height}
+ */
+function system_images_error() {
+  header('Content-type: image/jpg');
+  
+  $size = '85x85';
+  if ($_GET['size'] && strpos($_GET['size'], 'x') !== false) {
+    list($width, $height) = explode('x', $_GET['size']);
+    if (is_numeric($width) && is_numeric($height)) {
+      $size = $width .'x'.$height;
+    }
+  }
+  
+  $path = var_get('image_error', 'misc/images/logo.png');
+  
+  if (is_file($path)) {
+    
+    if ($filepath = image_get_thumb('error', $path, $size, 'scale_and_crop')) {
+      echo file_get_contents($filepath);
+    }
+  } else {
+    echo 'image error!';
+  }
+  exit;
+}
+
+/**
+ * 全局重定向地址，方便模块创建重定向，省去定义 hook_menu 的步骤
+ * 不验证权限，请在 module_system_tools_go 中自行验证
+ */
+function system_tools_go() {
+  $module = !empty($_POST['module']) ? $_POST['module'] : $_GET['module'];
+  
+  if ($module && isset($GLOBALS['conf']['modules'][$module])) {
+    
+    // 传递 $_POST、$_GET
+    if ($path = module_invoke($module, 'system_tools_go', $_POST, $_GET)) {
+      
+      if (is_array($path)) {
+        /**
+         * 传递一个数组，参数见 dd_goto，如：
+         * array(
+         *  'user',
+         *  array('op' => 'view')
+         * );
+         */
+        call_user_func_array('dd_goto', $path);
+      } else {
+        dd_goto($path);
+      }
+    }
+    
+  } else if (!empty($_GET['go'])) {
+    dd_goto(urldecode($_GET['go']));
+  }
+  
+  exit;
+}
+
+/**
+ * 用于图片验证码的中文字体是否存在
+ */
+function system_is_captcha_ttf() {
+  static $return;
+  if (!isset($return)) {
+    $return = false;
+    if ($ttf = var_get('captcha_file_ttf')) {
+      $return = is_file(DIDA_ROOT . $ttf);
+    }
+  }
+  return $return;
+}
+
+/**
+ * 添加管理区块自定义快捷方式
+ * @param (array) $value
+ *  链接参数
+ */
+function system_set_custom_block_links($value) {
+  $v = new stdClass;
+  $v->data['path'] = $value['path'];
+  $v->data['title'] = $value['title'];
+  $v->ext_type = 'system_custom';
+  $v->ext_type2 = 'block_links';
+  $v->ext_id = isset($value['uid']) ? $value['uid'] : $GLOBALS['user']->uid;
+  
+  if (dd_storage_save($v)) {
+    cache_del('*', 'admin_menus_'.$GLOBALS['user']->uid);
+    return $v;
+  }
+}
+
+/**
+ * 删除快捷方式
+ * @param (int) $id
+ *  storage id
+ * @param (int) $uid
+ *  默认为当前用户
+ */
+function system_del_custom_block_links($id, $uid = NULL) {
+  if (!isset($uid)) $uid = $GLOBALS['user']->uid;
+  
+  if (db_exec('DELETE FROM {storage} WHERE id = ? AND ext_id = ? AND ext_type = ? AND ext_type2 = ?',
+    array($id, $uid, 'system_custom', 'block_links'))) {
+    cache_del('*', 'admin_menus_'.$GLOBALS['user']->uid);
+    return true;
+  }
+}
+
+/**
+ * 获取管理区块自定义快捷方式
+ */
+function system_get_custom_block_links($uid) {
+  static $item;
+
+  if (!isset($item)) {
+    $item = array();
+    if ($fetch = db_query('SELECT data, id FROM {storage} WHERE ext_type = ? AND ext_type2 = ? AND ext_id = ? 
+    ORDER BY weight ASC, timestamp DESC', array('system_custom', 'block_links', $uid))){
+      foreach ($fetch as $o) {
+        $data = unserialize($o->data);
+        if ($data['title'] && $data['path']) {
+          $item[] = array($data['title'], $data['path'], array('attributes' => array('alt' => $o->id)));
+        }
+      }
+    }
+  }
+  
+  return $item;
+}
+
+/**
+ * @Implement of hook_system_admin_menus()
+ * 管理菜单
+ */
+function system_system_admin_menus() {
+  return array(array(
+    array(t('system', '站点设置'), 'admin/settings'),
+    array(t('system', '站点信息'), 'admin/settings/global'),
+    //array(t('system', '计划任务'), 'admin/settings/cron'),
+    array(t('system', '错误设置'), 'admin/settings/error'),
+    array(t('system', 'robots 设置'), 'admin/settings/robots'),
+    array(t('system', '模块管理'), 'admin/modules'),
+    array(t('system', '主题管理'), 'admin/themes'),
+    array(t('system', '缓存管理'), 'admin/cache'),
+    array(t('system', '输入设置'), 'admin/filter'),
+    array(t('system', '语言设置'), 'admin/lang'),
+    array(t('system', '文件设置'), 'admin/settings/files'),
+    array(t('system', '验证码设置'), 'admin/settings/captcha'),
+    array(t('system', '主导航设置'), 'admin/site_menu'),
+    array(t('system', '首页设置'), 'admin/front'),
+    array(t('system', '别名管理'), 'admin/alias'),
+    array(t('system', '系统日志'), 'admin/logs'),
+    array(t('system', '执行 SQL'), 'admin/sql'),
+  ), t('system', '系统设置'));
+}
+
+/**
+ * 将 html 数组解析为  strip_tags 所需的字符串，
+ * @param (int) $fid
+ *  过滤器 id
+ * @param (array) $tags
+ *  允许的 html
+ */
+function _system_filter_tags($fid, array $tags = array()) {
+  static $cache;
+  if (!isset($cache[$fid])) {
+    $cache[$fid] = '';
+    if ($tags) {
+      foreach ($tags as $key => $t) {
+        $cache[$fid] .= '<'.$key.'>'; 
+      }
+    }
+  }
+  return $cache[$fid];
+}
+
+/**
+ * 换行符转换
+ * @param (array) $mat
+ */
+function _system_filter_code_nl2br($mat) {
+  if ($mat[1] != '>') {
+    return $mat[1] . '<br class="system_filter"/>';
+  } else {
+    return '';
+  }
+}
+
+/**
+ * 清除字符串中不被允许的标签
+ * @param (string) $value
+ *  字符串
+ * @param (array) $tags
+ *  不允许的标签
+ */
+function system_filter_deny_tags($value, array $tags = array('style', 'script', 'link')) {
+  foreach ($tags as $tag) {
+    $pat[] = '/<' . $tag . '(.*?)\/' . $tag . '>/ims';
+  }
+  
+  return preg_replace($pat, '', $value);
+}
+
+/**
+ * hook_filter
+ * 过滤器接口
+ * @param (string) $op
+ *  操作类型：
+ *   view - 执行过滤，list - 获取列表，add - 添加过滤器，form - 添加\编辑表单
+ *   validate - 表单验证，save - 表单保存，delete - 删除过滤器
+ * @param (int) $delta
+ *  过滤器在模块内部的编号
+ * @param (int) $format
+ *  调用该种过滤器的输入格式编号
+ * @param (object or string) $value
+ *  过滤器数据或表单数据，执行过滤时为需过滤的文本
+ * @param (string) $node_type
+ *  view 时，节点自定义类型
+ * @param (int) $node_nid
+ *  view 时，节点自定义 id
+ * @param (int) $filter_id
+ *  后台添加的过滤器 id
+ * @return *
+ */
+function system_filter($op, $delta = NULL, $format = NULL, $value = NULL, $filter_id = NULL, $node_type = NULL, $node_nid = NULL) {
+  global $_filter_is_php_code;
+
+  switch ($op) {
+    case 'view':
+      switch ($delta) {
+        case 'html':
+          $value = check_plain($value);
+        break;
+
+        case 'br':
+          // 换行符前是 html 标签，则不替换
+          $value = preg_replace_callback(
+            "/(.*?)\n/",
+            '_system_filter_code_nl2br',
+            str_replace(array("\r\n", ">\n"), array("\n", '>'), $value)
+          );
+        break;
+
+        case 'php':
+          // 已全局禁用 php 输入格式
+          if ($_filter_is_php_code != true) {
+            return $value;
+          }
+          // 执行 php 代码
+          $value = filter_tags_php($value);
+        break;
+
+        default: // 其它手动添加的过滤器
+          if ($filter = filter_get_filters($filter_id)) {
+            switch ($filter->delta) {
+              case 'keyword':
+                // 词语过滤、替换
+                $value = strtr($value, $filter->tags);
+              break;
+
+              case 'html_disabled':
+                // 去除不被允许的 html 标签
+                preg_match_all('/<([\/|\s]*)([0-9a-z]*).*?>/ims', $value, $matches);
+                if ($matches) {
+                  $filter_tags_type = var_get('filter_system_type_'.$filter->fid);
+                  foreach ($matches[2] as $key => $matche) {
+                    if ($filter->tags[mb_strtolower($matche)]) {
+                      if (!$filter_tags_type) {
+                        $value = str_replace($matches[0][$key], check_plain($matches[0][$key]), $value);
+                      } else {
+                        $value = str_replace($matches[0][$key], '', $value);
+                      }
+                    }
+                  }
+                }
+              break;
+
+              case 'html_enabled':
+                // 只保留允许的标签
+                if (!var_get('filter_system_type_'.$filter->fid)) {
+                  preg_match_all('/<([\/|\s]*)([0-9a-z]*).*?>/ims', $value, $matches);
+                  if ($matches) {
+                    foreach ($matches[2] as $key => $matche) {
+                      if (!$filter->tags[mb_strtolower($matche)]) {
+                        $value = str_replace($matches[0][$key], check_plain($matches[0][$key]), $value);
+                      }
+                    }
+                  }
+                } else {
+                  $value = strip_tags($value, $filter->strip_tags);
+                }
+              break;
+            }
+          }
+      }
+    return $value;
+    
+    case 'list':
+      // 注册过滤器列表
+      $lists = array(
+        'html' => array(
+          'title' => 'HTML 过滤',
+          'description' => '将内容做为纯文本，不解析 HTML 标签',
+        ),
+        'br' => array(
+          'title' => '换行符转换',
+          'description' => '将换行符转换为 <br />',
+        ),
+        'php' => array(
+          'title' => 'PHP 解析',
+          'description' => '将 <?php ?> 内的代码解析为 PHP。注意：危险！',
+        ),
+      );
+
+      if ($fetch = db_query('SELECT * FROM {filter_tags}')) {
+        foreach ($fetch as $o) {
+          $lists[$o->fid] = array(
+            'title' => $o->title,
+            'filter_id' => $o->fid,
+            'update' => 1,
+            'delete' => 1,
+            'description' => $o->description
+          );
+        }
+      }
+
+      if ($_filter_is_php_code != true) {
+        unset($lists['php']);
+      }
+    return $lists;
+
+    case 'add':
+      // 注册供手动添加的过滤器规则
+    return array(
+        'html_enabled' => array(
+          'title' => t('system', 'HTML 标签过滤器'),
+          'description' => t('system', '设置被允许的 HTML 标签')
+        ),
+        'html_disabled' => array(
+          'title' => t('system', 'HTML 标签过滤器'),
+          'description' => t('system', '设置不允许的 HTML 标签')
+        ),
+        'keyword' => array(
+          'title' => t('system', '词语过滤器'),
+          'description' => t('system', '设置需过滤或替换的词语')
+        ),
+      );
+    case 'form':
+      switch ($delta) {
+        case 'keyword':
+          $form['body'] = array(
+            '#type' => 'textarea',
+            '#title' => t('system', '词语列表'),
+            '#required' => 1,
+            '#default_value' => $value->body,
+            '#description' => t('system', '被过滤或替换的词语，一行一个。替换和被替换词语之间以 | 分割，如：美国|中国，即将所有“美国”替换为“中国”'),
+            '#attributes' => array('rows' => 12, 'cols' => 80),
+          );
+        break;
+        case 'html_enabled':
+          $form['body'] = array(
+            '#type' => 'textfield',
+            '#title' => t('system', '允许的标签'),
+            '#required' => 1,
+            '#default_value' => $value->body,
+            '#attributes' => array('size' => 60),
+            '#description' => t('system', 'HTML 标签，以空格分隔。如： h2 h3 ul')
+          );
+          $form['strip_type'] = array(
+            '#type' => 'radio',
+            '#title' => t('system', '过滤模式'),
+            '#required' => 1,
+            '#default_value' => var_get('filter_system_type_'.$value->fid),
+            '#options' => array(
+              t('system', '将不允许的标签转换为 &lt; &gt;'),
+              t('system', '将不允许的标签清除'),
+            )
+          );
+        break;
+        default:
+          $form['body'] = array(
+            '#type' => 'textfield',
+            '#title' => t('system', '不允许的标签'),
+            '#required' => 1,
+            '#default_value' => $value->body,
+            '#attributes' => array('size' => 60),
+            '#description' => t('system', 'HTML 标签，以空格分隔。如： h2 h3 ul')
+          );
+          $form['strip_type'] = array(
+            '#type' => 'radio',
+            '#title' => t('system', '过滤模式'),
+            '#required' => 1,
+            '#default_value' => var_get('filter_system_type_'.$value->fid),
+            '#options' => array(
+              t('system', '将不允许的标签转换为 &lt; &gt;'),
+              t('system', '将不允许的标签清除'),
+            )
+          );
+      }
+    return $form;
+    case 'validate':
+      
+    return $error;
+    case 'save':
+      db_exec('UPDATE {filter_tags} SET body = ? WHERE fid = ?', array(trim($value->body), $value->fid));
+      var_set('filter_system_type_'.$value->fid, $value->strip_type);
+    break;
+    case 'delete':
+  }
+}
+
+/**
+ * @Implement of hook_block_view()
+ */
+function system_block_view($theme, $config = NULL) {
+  
+  if (!user_access('system view admin')) return false;
+  
+  global $user;
+  $language = $user->language ? $user->language : $GLOBALS['conf']['default_language'];
+  
+  if ($data = cache_get('admin_menus_' . $user->uid .'_'. $language)) {
+    $content = $data->data;
+  } else {
+    
+    if ($value = _module_invoke_all('system_admin_menus')) {
+      $table = cache_get('_admin_menu_list_'.$user->uid);
+      
+      if (var_get('admin_custom_links', 1)) {
+      
+        $content['didaSystemCustom'] = array(
+          system_get_custom_block_links($user->uid),
+          t('system', '快捷方式'),
+          '#weight' => $table->data ? $table->data['didaSystemCostom'] : -100
+        );
+        
+      }
+      foreach ($value as $module => $infos) {
+        $menus = $infos[0];
+        module_alter_all('alter_admin_menus', $module, $menus);
+        
+        foreach ($menus as $menu) {
+          if (_l_external($menu[1]) || menu_get_item($menu[1]) == 5) {
+            $content[$module][0][] = $menu;
+          }
+        }
+        
+        if ($content[$module]) {
+          $content[$module][1] = $infos[1];
+        }
+        
+        if (!empty($table->data)) {
+          $content[$module]['#weight'] = $table->data[$module];
+        } else if (!empty($infos['#weight']) ) {
+          $content[$module]['#weight'] = $infos['#weight'];
+        } else {
+          $content[$module]['#weight'] = 0;
+        }
+      }
+      
+      uasort($content, 'dd_form_cmp');
+      
+    }
+    
+    cache_set('admin_menus_' . $user->uid.'_' . $language, ($content ? $content : true));
+  }
+  
+  if (is_array($content)) {
+    if (var_get('admin_custom_links', 1)) {
+      $custom_path = $custom_title = true;
+      
+      if ($content['didaSystemCustom'][0]) {
+        foreach ($content['didaSystemCustom'][0] as $c) {
+          if (is_array($c) && $c[1] == $_GET['q']) {
+            $custom_path = $custom_title = false;
+          }
+        }
+      }
+      
+      if ($custom_path) {
+        $custom_path = $_GET['q'];
+      }
+      if ($custom_title) {
+        if ($custom_title = dd_get_title()) {
+          if (strpos($custom_title, '-') !== false) {
+            $custom_title = trim(current(explode('-', $custom_title)));
+          }
+        }
+      }
+      $add = '<div id="admin_custom_add_form">';
+      $add .= t('system', '链接：').'<input type="text" id="custom_path" name="custom_path" value="' . $custom_path . '" />';
+      $add .= t('system', '标题：').'<input type="text" id="custom_title" name="custom_title" value="' . $custom_title . '" />';
+      $add .= theme_get_element('dd_form_submit', array(
+        '#type' => 'submit',
+        '#attributes' => array('id' => 'admin_custom_add_submit'),
+        '#value' => t('system', '添加链接')
+      ));
+      $content['didaSystemCustom'][0][] = $add;
+    } else {
+      unset($content['didaSystemCustom']);
+    }
+    
+    foreach ($content as $module => $m) {
+      $items = array();
+      
+      if (!is_array($m[0])) continue;
+
+      foreach ($m[0] as $k) {
+        if (is_array($k)) {
+          if (!$k[2]) {
+            $items[] = l($k[0], $k[1]);
+          } else {
+            $items[] = l($k[0], $k[1], $k[2]);
+          }
+        } else {
+          $items[] = $k;
+        }
+      }
+      $block['content'] .= '<div id="system_admin_menu_list_'.$module.'">'.theme('item_list', $items,
+      '<span class="item_click_op"></span>' . $m[1], 'ul',
+      array('class' => 'admin_menus')).'</div>';
+    }
+    
+    $block['title'] = t('system', $config->title);
+  }
+  
+  return $block;
+}
+
+/**
+ * @Implement of hook_block_list()
+ */
+function system_block_list($theme) {
+  return array(
+    'adminLink' => array(
+				'title' => t('system', '网站管理'),
+				'region' => 'left',
+				'visibility' => 1,
+        'weight' => -30
+      )
+    );
+}
+
+/**
+ * 清除语言列表缓存
+ */
+function system_lang_cache() {
+	if ($fetch = db_query('SELECT * FROM {languages}')) {
+  	foreach ($fetch as $o) {
+  		$lang[$o->language] = $o->name;
+  	}
+  	var_set('languages', $lang);
+  }
+}
+
+/**
+ * 配置提交表单
+ */
+function system_setting_form($form) {
+  $form['fields']['submit'] = array(
+    '#type' => 'submit',
+    '#submit' => 'system_setting_form_submit',
+  );
+  return $form;
+}
+
+function system_setting_form_submit($form, &$value) {
+  if (is_array($value)) {
+    foreach ($value as $key => $val) {
+      if (!in_array($form['fields'][$key]['#type'], array('hidden', 'submit', 'button', 'file', 'captcha'))) {
+        var_set($key, $val, 0);
+      }
+    }
+    if ($form['settings']['#submit'] && function_exists($form['settings']['#submit'])) {
+      call_user_func($form['settings']['#submit'], $form, $value);
+    }
+    var_init(); // 清除配置文件缓存
+    dd_set_message(t('system', '保存成功'));
+  }
+}
+
+/**
+ * 获取可视化编辑器
+ * @param (string) $dom
+ *  html dom
+ * @param (array) $v
+ *  编辑器配置
+ */
+function dd_get_editor($dom, $v = array()) {
+  // @TODO 编辑器相关从核心中移出。编辑器模块：http://websvn.didaah.org/listing.php?repname=dida.modules.editor
+}
+
+/**
+ * 获取纯文本编辑器
+ * @param (string) $dom
+ *  html dom
+ * @param (string) $type
+ *  输入格式
+ * @param (array) $v
+ *  配置参数
+ */
+function dd_get_editor_text($dom, $type = 'html', $v = array()) {
+  static $i;
+  
+  if (!$i) {
+    dd_add_js('misc/markitup/jquery.markitup.js');
+    dd_add_js('misc/markitup/sets/dida/set.js');
+    dd_add_css('misc/markitup/skins/dida/style.css');
+  }
+  
+  if ($v['AutoSaveUrl']) {
+    dd_add_js('misc/jquery.form.js');
+  }
+  
+  if ($v['extPreview'] !== false) {
+    dd_jqui();
+  }
+  
+  $v['root'] = f('misc/markitup/');
+  
+  $js = array('dom' => $dom, 'type' => $type);
+  if ($v) {
+    $js['options'] = $v;
+  }
+  
+  dd_add_js(array('markItUp' => array($js)), 'setting');
+  
+  $i = 1;
+}
+
+/**
+ * @Implement of hook_alias_reservation()
+ */
+function system_alias_reservation() {
+	return array('admin/', 'files/', 'modules/', 'themes/', 'sites/', 'log/', 'tools/', 'misc/', 'includes/');
+}
+
+/**
+ * 获取 swfupload 上传
+ * @param (string) $dom
+ *  html 元素 id，如： mydom， 不指定将递增
+ * @param (array) $v
+ *  swfupload 配置参数
+ * @param $html
+ *  是否返回 html 代码，若不需要，则必须自行输出 html 代码
+ * @returu 若 $html 为真，返回 swfupload 所需的 html 代码
+ */
+function dd_get_swfupload($dom = NULL, $v = array(), $html = 1) {
+  // @TODO swfupload 相关将移出 system 模块，可在 editor 模块中找到相关方法
+}
+
+/**
+ * 检查更新，将发送版本信息、站点域名、名称、站长信箱、创建时间到更新服务器
+ * 以上信息仅用于检查更新，以及统计程序的安装数量，不涉及任何与注册用户有关的隐私信息
+ */
+function system_status_update($op = NULL) {
+  if (!$data = cache_get('system_status_update')) {
+    $value = array(
+      'version' => DIDA_VERSION, // 程序版本
+      'host' => $GLOBALS['base_url'], // 当前域名
+      'created' => var_get('site_created'), // 创建时间
+      'name' => var_get_key('site_global', 'name'), // 站点名称
+      'mail' => var_get_key('site_global', 'mail'), // 站长信箱
+    );
+    $result = dd_http_request('http://www.didaah.org/custom.php?module=dida_tools&op=update', $value);
+    if ($result->code > 0 && $result->data) {
+      if ($data = json_decode($result->data)) {
+        // 两次检查间隔至少 12 小时
+        cache_set('system_status_update', $data, 'cache', 43200);
+      }
+    }
+  }
+  
+  if ($data && user_access('system view admin')) {
+    if ($data->version == 0) {
+      if ($op != 'cron') dd_set_message(t('system', '你使用的是当前最新版本'));
+    } else {
+      dd_set_message(t('system', '最新版本为 %ver，请及时升级：!view，!down', array('%ver' => $data->version, '!view' => l(t('dida_tools', '查看'), $data->new_link), '!down' => l(t('dida_tools', '下载'), $data->new_down))));
+    }
+  }
+  if ($_GET['redirect']) {
+    dd_goto($_GET['redirect']);
+  }
+}
+
+/**
+ * 首页显示内容，将触发 hook_front_view()，模块将需要显示在首页的数据添加到 $front 对象中，供自定义使用
+ * 通常应使用模块名称做为对象名，方便主题制作 ，如 fields 模块定义的数据均在  $front->fields 之中
+ * 假如设置使用默认布局 ，将触发 hook_front()，模块可以返回一个数组，如：
+ * return $array('#data' => '要显示的内容', '#weight' => -10) 或返回一个字符串 rerurn '要显示的内容';
+ * 最后所有模块需要显示的内容，按权重合并显示在主页。
+ * 通常情况 下，hook_front() 返回的内容和 hook_front_view() 的原始数据是一致的，前者仅多了一些 html 格式处理
+ * 这样，在用户选择自定义布局的情况下，也可以通过 $front 对象获取到模块自定义内容
+ * 假如设置交给特定模块处理， hook_front_view()、hook_front() 均不会执行，而是调用该模块  _module_front_view() 函数
+ */
+function front_page() {
+  /**
+   * 将首页完全交给某个模块来处理
+   */
+  if ($module = var_get('front_view_module', 0)) {
+    $function = '_'.$module.'_front_view';
+    if (function_exists($function)) {
+      return $function();
+    }
+  }
+  
+  $front = new stdClass();
+  /**
+   * 触发 hook_front_view()
+   */
+  module_alter_all('front_view', $front);
+  
+  if (!var_get('front_view_type', 0)) {
+    if ($data = _module_invoke_all('front_page')) {
+      $i = 0;
+      foreach ($data as $module => $content) {
+        $row = array();
+        if (is_array($content)) {
+          $row['#weight'] = !isset($content['#weight']) ? $i : $content['#weight'];
+          $row['#data'] = $content['#data'];
+        } else {
+          $row['#weight'] = $i;
+          $row['#data'] = $content;
+        }
+        
+        $row['#data'] = '<div class="front_block_'.$module.'">'.$row['#data'].'</div>';
+        
+        $contents[] = $row;
+        ++$i;
+      }
+      
+      uasort($contents, 'dd_form_cmp');
+      
+      foreach ($contents as $d) {
+        $front->content .= $d['#data'];
+      }
+    }
+  }
+
+  if (empty($front->content)) $front->content = custom_get('front_default');
+  
+  return theme('front', $front);
+}
+
+/*storage*/
+
+/**
+ * 按 ext_type 获取自定义数据
+ * @param (string) $ext_type
+ *  扩展类型
+ * @param (bool) $clear
+ *  是否清除缓存，直接从数据库读取
+ *  
+ * @return (array) 以 ext_type2 索引
+ */
+function dd_get_storage($ext_type, $clear = NULL) {
+  static $storage;
+  if (!isset($storage[$ext_type])) {
+    if (!$clear && ($cache = cache_get('storage_cache_'.$ext_type))) {
+      $storage[$ext_type] = $cache->data;
+    } else if ($fetch = db_query('SELECT * FROM {storage} WHERE ext_type = ? ORDER BY weight ASC, timestamp DESC', 
+    array($ext_type))) {
+      foreach ($fetch as $data) {
+        $data->data = unserialize($data->data);
+        $var[$data->ext_type2][$data->id] = $data;
+      }
+      $storage[$ext_type] = $var;
+      
+      cache_set('storage_cache_'.$ext_type, $var);
+    }
+  }
+  return $storage[$ext_type];
+}
+
+/**
+ * 按 ext_type 获取自定义数据
+ * @param (string) $ext_type
+ *  扩展类型
+ * @param (bool) $clear
+ *  是否清除缓存，直接从数据库读取
+ *  
+ * @return (array) 以 id 索引
+ */
+function dd_get_storage_id($ext_type, $clear = NULL) {
+  static $storage;
+  if (!isset($storage[$ext_type])) {
+    if (!$clear && ($cache = cache_get('storage_cache_id_'.$ext_type))) {
+      $storage[$ext_type] = $cache->data;
+    } else if ($fetch = db_query('SELECT * FROM {storage} WHERE ext_type = ? ORDER BY weight ASC, timestamp DESC', 
+    array($ext_type))) {
+      foreach ($fetch as $data) {
+        $data->data = unserialize($data->data);
+        $var[$data->id] = $data;
+      }
+      $storage[$ext_type] = $var;
+      
+      cache_set('storage_cache_id_'.$ext_type, $var);
+    }
+  }
+  return $storage[$ext_type];
+}
+
+/**
+ * 获取实时数据
+ * @param (string) $ext_type
+ * @param (string) $ext_type2
+ */
+function dd_storage_get_data($ext_type, $ext_type2 = NULL) {
+  $fetch = $data = NULL;
+  
+  if ($ext_type2) {
+    $fetch = db_query('SELECT * FROM {storage} WHERE ext_type = ? AND ext_type2 = ? 
+    ORDER BY weight ASC, timestamp DESC', array($ext_type, $ext_type2));
+  } else {
+    $fetch = db_query('SELECT * FROM {storage} WHERE ext_type = ? 
+    ORDER BY weight ASC, timestamp DESC', array($ext_type));
+  }
+  
+  if ($fetch) {
+    foreach ($fetch as $o) {
+      $o->data = unserialize($o->data);
+      $data[$o->ext_type2][] = $o;
+    }
+  }
+  
+  return $data;
+}
+
+/**
+ * 保存内容
+ * @param (object) $v
+ */
+function dd_storage_save(&$v) {
+  $v->timestamp = $_SERVER['REQUEST_TIME'];
+  if ($v->id) {
+    $args = array('id');
+  } else {
+    $args = NULL;
+  }
+  if (db_write_record('storage', $v, $args)) {
+    return true;
+  }
+  
+  return false;
+}
+
+/**
+ * 清除缓存
+ * @param (string) $ext_type
+ *  若无值，则清除全部缓存
+ */
+function dd_storage_clear_cache($ext_type = NULL) {
+  if ($ext_type) {
+    dd_get_storage($ext_type, 1);
+    dd_get_storage_id($ext_type, 1);
+  } else {
+    cache_del('*', 'storage_cache_');
+  }
+}
+
+/**
+ * 删除数据
+ * @param (object) $v
+ */
+function dd_storage_del($v) {
+  if (!$v->id) return false;
+  if (db_exec('DELETE FROM {storage} WHERE id = ?', array($v->id))) {
+    return true;
+  }
+}
+
+/**
+ * 管理界面
+ * @param (string) $ext_type
+ */
+function dd_storage_admin($ext_type, $ext_type2 = NULL, $ext_id = NULL, $fetch = NULL, $limit = NULL) {
+  global $pager_total_items;
+  
+  $info = module_invoke_all('dd_storage_info');
+  if (!$info[$ext_type]) return false;
+  
+  dd_set_sub_tabs(array(l(t('system', '清除缓存'), $_GET['q'], array('query' => 'storage_op=cache'))));
+  
+  if (!empty($_GET['storage_op'])) {
+    if (!empty($_GET['storage_id'])) {
+      switch ($_GET['storage_op']) {
+        case 'update':
+          $v = db_query('SELECT * FROM {storage} WHERE id = ? AND ext_type = ?',
+          array($_GET['storage_id'], $ext_type), array('return' => 'one'));
+          if ($v->data) {
+            $v->data = unserialize($v->data);
+          }
+        break;
+        case 'delete':
+          if (db_exec('DELETE FROM {storage} WHERE id = ? AND ext_type = ?', array($_GET['storage_id'], $ext_type))) {
+            echo 'tr';
+          } else {
+            echo t('system', '删除失败');
+          }
+        exit;
+        case 'weight':
+          db_exec('UPDATE {storage} SET weight = ? WHERE id = ? AND ext_type = ?', array($_POST['value'], $_GET['storage_id'], $ext_type));
+        exit;
+      }
+    } else if ($_GET['storage_op'] == 'cache') {
+      dd_storage_clear_cache($ext_type);
+      module_invoke_all('dd_storage_clear', $ext_type, $ext_type2, $ext_id);
+      dd_set_message(t('system', '清除成功'));
+      
+      dd_goto($_GET['q']);
+    }
+  }
+  
+  if (!isset($fetch)) {
+  
+    if ($ext_id) {
+      $fetch = pager_query('SELECT * FROM {storage} WHERE ext_id = ? AND ext_type = ? AND ext_type2 = ? 
+      ORDER BY weight ASC, timestamp DESC', 10, 1, NULL, array($ext_id, $ext_type, $ext_type2));
+    } else if ($ext_type2) {
+      $fetch = pager_query('SELECT * FROM {storage} WHERE ext_type = ? AND ext_type2 = ? 
+      ORDER BY weight ASC, timestamp DESC', 10, 1, NULL, array($ext_type, $ext_type2));
+    } else {
+      $fetch = pager_query('SELECT * FROM {storage} WHERE ext_type = ? ORDER BY ext_type ASC, timestamp DESC',
+      10, 1, NULL, array($ext_type));
+    }
+    
+  }
+  
+  if ($fetch) {
+    $redirect = urlencode(url($_GET['q'], array('query' => dd_query_string_encode($_GET, array('q', 'storage_op', 'storage_id', 'redirect')))));
+    foreach ($fetch as $o) {
+      
+      if ($info[$ext_type][$o->ext_type2]['admin_view'] && function_exists($info[$o->ext_type][$o->ext_type2]['admin_view'])) {
+        $view = call_user_func($info[$o->ext_type][$o->ext_type2]['admin_view'], unserialize($o->data));
+      } else {
+        $items = array();
+        foreach (unserialize($o->data) as $key => $item) {
+          if (is_array($item)) {
+            continue;
+          }
+          
+          if (mb_strlen($item) > 200) {
+            $item = mb_substr($item, 0, 200) . '…';
+          }
+          
+          $items[] = _system_get_option_name($key, $info[$o->ext_type][$o->ext_type2]['options']) . check_plain($item);
+        }
+        $view = theme('item_list', $items, NULL, 'ul', array('class' => 'system_storage_admin_info_list'));
+      }
+      
+      $table[] = array(
+        $view,
+        array('data' =>dd_form_weight(array(
+            '#value' => $o->weight,
+            '#attributes' => array(
+              'class' => 'changeconfirm dd_form_ajax_field',
+              'href' => url($_GET['q'], array('query' => 'storage_op=weight&storage_id='.$o->id))
+            ),
+            '#name' => 'admin_storage_'.$o->id,
+            '#start' => -30,
+            '#end' => 30
+          )
+        ), 'class' => 'weight'),
+        
+        array('data' => dd_imp(array(
+            l(t('system', '编辑'), $_GET['q'], array(
+              'query' => 'storage_op=update&storage_id=' . $o->id . '&redirect=' . $redirect,
+              'fragment' => 'dd_storage_form'
+            )),
+            l(t('system', '删除'), $_GET['q'], array(
+              'query' => 'storage_op=delete&storage_id=' . $o->id,
+              'attributes' => array('class' => 'confirmajax')
+            ))
+          )), 'class' => 'links'
+        )
+      );
+    }
+    
+    $output = theme(
+      'table',
+      array(t('system', '内容'), t('system', '排序'), t('system', '操作')),
+      $table, 
+      array('class' => 'dida_storage_admin_table')
+    );
+
+    $output .= pager_view(array(), 10, 1);
+    
+  }
+  
+  $limit = isset($limit) ? $limit : $pager_total_items[1];
+  
+  if ($_GET['storage_op'] == 'update' && $_GET['storage_id'] && $v) {
+    
+    $output .= '<div id="dd_storage_form_call_' . $ext_type2 . '">' . dd_get_form('dd_storage_form', $v, $info[$ext_type][$ext_type2]) . '</div>';
+    
+  } else if ($ext_type2 && $info[$ext_type][$ext_type2] 
+  && (!$info[$ext_type][$ext_type2]['limit'] || $limit < $info[$ext_type][$ext_type2]['limit'])) {
+    $v = new stdClass;
+    $v->ext_type = $ext_type;
+    $v->ext_type2 = $ext_type2;
+    $v->ext_id = $ext_id;
+    
+    $output .= '<div id="dd_storage_form_call_' . $ext_type2 . '">' . dd_get_form('dd_storage_form', $v, $info[$ext_type][$ext_type2]) . '</div>';
+  }
+  
+  return $output;
+}
+
+function _system_get_option_name($key, $options = NULL) {
+  $args = array(
+    'title' => t('system', '标题'),
+    'path' => t('system', '链接'),
+    'file' => t('system', '图片'),
+  );
+  
+  if ($options) {
+    $args += $options;
+  }
+  
+  return dd_get_strong($args[$key] ? $args[$key] : $key);
+}
+
+/**
+ * 内容表单
+ * @param object $v
+ *  若有值，则为编辑状态
+ * @param * $info
+ *  其它信息
+ * @return array
+ */
+function dd_storage_form($v = NULL, $info = NULL) {
+  $form = array(
+    'settings' => array(),
+    'fields' => array(),
+    '__data' => $info,
+  );
+
+  $form['fields']['data']['title'] = array(
+    '#type' => 'textfield',
+    '#title' => t('system', '标题'),
+    '#default_value' => $v->data['title'],
+    '#required' => 1,
+  );
+
+  $form['fields']['data']['path'] = array(
+    '#type' => 'textfield',
+    '#title' => t('system', '链接'),
+    '#default_value' => $v->data['path'],
+    '#required' => 1,
+  );
+ 
+  $form['fields']['data']['target'] = array(
+    '#type' => 'radio',
+    '#title' => t('system', '打开'),
+    '#default_value' => empty($v->data['target']) ? 0 : 1,
+    '#options' => array(t('system', '默认'), t('system', '新窗口打开')),
+  );
+  
+  $form['fields']['weight'] = array(
+    '#type' => 'weight',
+    '#title' => t('system', '排序'),
+    '#default_value' => $v->weight,
+    '#start' => -30,
+    '#end' => 30
+  );
+  
+  $form['fields']['file'] = array(
+    '#type' => 'file',
+    '#title' => t('system', '图片'),
+    '#options' => array('image' => true)
+  );
+
+  if ($v->data['file']) {
+    $form['fields']['data']['file'] = array(
+      '#type' => 'hidden',
+      '#default_value' => $v->data['file'],
+      '#constant' => 1
+    );
+  }
+
+  $form['fields']['id'] = array(
+    '#type' => 'hidden',
+    '#default_value' => $v->id,
+    '#constant' => 1
+  );
+
+  $form['fields']['ext_type2'] = array(
+    '#type' => 'hidden',
+    '#default_value' => $v->ext_type2,
+    '#constant' => 1
+  );
+
+  $form['fields']['ext_type'] = array(
+    '#type' => 'hidden',
+    '#default_value' => $v->ext_type,
+    '#constant' => 1
+  );
+
+  $form['fields']['ext_id'] = array(
+    '#type' => 'hidden',
+    '#default_value' => $v->ext_id ? $v->ext_id : 0,
+    '#constant' => 1
+  );
+  
+  module_alter_all('dd_storage_form', $v, $form, $info);
+  
+  if (!$form) return false;
+  
+  $form['fields']['submit']['#type'] = 'submit';
+  
+  if (!empty($v->redirect)) {
+    $redirect = $v->redirect;
+  } else if (!empty($_GET['redirect'])) {
+    $redirect =  $_GET['redirect'];
+  } else {
+    $redirect = $_SERVER['REQUEST_URI'];
+  }
+  
+  $form['settings'] = array(
+    '#title' => $v->id ? t('system', '编辑内容') : t('system', '添加内容'),
+    '#validate' => array('dd_storage_form_validate'),
+    '#values_object' => true,
+    '#ajax_validate' => true,
+    '#redirect' => $redirect
+  );
+  
+  return $form;
+}
+
+function dd_storage_form_validate(&$form, &$v) {
+  if (!$t = module_invoke_all('dd_storage_validate', $v['_dida_values'], $form, $form['__data'])) {
+    if (empty($v['_dida_values']->id)) {
+      if (db_exec('INSERT INTO {storage} (ext_type, data) VALUES (?, 0)', array($v['_dida_values']->ext_type))) {
+        $v['_dida_values']->id = db_last_insert_id();
+      } else {
+        dd_set_message(t('system', '意外错误，写入数据库失败'));
+        return true;
+      }
+    }
+    
+    $validate = NULL;
+    if (!empty($form['fields']['file']) && !empty($_FILES['file'])) {
+      if (is_array($form['fields']['file']['#options'])) {
+        $validate = $form['fields']['file']['#options'];
+      }
+      
+      $validate['no_insert'] = true;
+      $validate['savepath'] = 'storage';
+      $validate['filename'] = $v['_dida_values']->id;
+      if ($file = file_save_upload($_FILES['file'], $validate, 0)) {
+        if ($v['_dida_values']->data['file'] && $file->filepath == $v['_dida_values']->data['file']) {
+          file_delete_dir(str_replace(end(explode('/', $file->filepath)), $v['_dida_values']->id, $file->filepath));
+        }
+        $v['_dida_values']->data['file'] = $file->filepath;
+      }
+    }
+    
+    module_invoke_all('dd_storage_before', $v['_dida_values'], $form, $form['__data']);
+    
+    if (dd_storage_save($v['_dida_values'])) {
+      module_invoke_all('dd_storage_save', $v['_dida_values'], $form, $form['__data']);
+      dd_set_message(t('system', '操作成功'));
+    }
+  }
+
+  return $t;
+}
+
+/*storage end*/
+
+/**
+ * @Implement of hook_dd_storage_info()
+ */
+
+function system_dd_storage_info() {
+  return array(
+    'system_custom' => array(
+      'block_links' => array(
+        'title' => t('system', '快捷方式'),
+        'description' => t('system', '管理页区块自定义快捷方式')
+      ),
+    ),
+   );
+}
+
+/**
+ * @Implement of hook_token_list()
+ */
+function system_token_list() {
+	return array(
+		'[date_y]' => array(
+			'title' => t('system', '当前年份，如：%string', array('%string' => date('Y'))),
+		),
+		'[date_d]' => array(
+			'title' => t('system', '当前日期，如：%string', array('%string' => date('d'))),
+		),
+		'[date_m]' => array(
+			'title' => t('system', '当前月份，如：%string', array('%string' => date('m'))),
+		),
+		'[site_name]' => array(
+			'title' => t('system', '网站名称'),
+		),
+    '[front]' => array(
+      	'title' => t('system', '网站首页'),
+    ),
+		'[site_default_language]' => array(
+			'title' => t('system', '网站默认语言'),
+		),
+		'[user_language]' => array(
+			'title' => t('system', '用户当前语言'),
+		),
+	);
+}
+
+/**
+ * @Implement of hook_token_replace()
+ * @param (string) $text
+ *  原始字符串
+ * @param (*) $value
+ *  通配符数据来源，如 $user 或 $node 等
+ */
+function system_token_replace($text, $value = NULL) {
+	$args = array(
+		'[date_y]' => date('y'),
+    '[date_Y]' => date('Y'),
+		'[date_d]' => date('d'),
+		'[date_m]' => date('m'),
+    '[front]' => $GLOBALS['base_url'],
+		'[site_name]' => var_get('site_name'),
+		'[site_default_language]' => var_get('default_language'),
+		'[user_language]' => $GLOBALS['language_code'],
+	);
+	return strtr($text, $args);
+}
+
+/**
+ * 没有数据
+ */
+function system_no_content($content = NULL) {
+  if (!$content) $content = t('system', '还没有数据');
+  return '<h2 class="system_no_content">'.$content.'</h2>';
+}
+
+/**
+ * @Implement of hook_template_preprocess_x()
+ * 
+ * 区域模板文件加载顺序：
+ * block_{$block->module}_{$block->delta}.tpl.php
+ * block_{$block->module}.tpl.php
+ * block.tpl.php
+ * 
+ */
+function system_template_preprocess_file(&$var, $hook) {
+  if (!empty($var['file']->ext_type)) {
+    $var['theme_config']->tpl[] = 'file_' . $var['file']->ext_type . '.tpl.php';
+    if (!empty($var['file']->filemime)) {
+      $var['theme_config']->tpl[] = 'file_' . $var['file']->ext_type . '_' . preg_replace('/[^0-9a-z]/', '', $var['file']->filemime) . '.tpl.php';
+    }
+  }
+}
+
+/**
+ * @Implement of hook_theme()
+ */
+function system_theme() {
+  return array(
+		'print' => array(
+		  'tpl' => 'print.tpl.php',
+		  'args' => array('content'),
+		),
+    'error' => array(
+      'tpl' => 'error.tpl.php',
+      'args' => array('content', 'code'),
+    ),
+		'front' => array(
+		  'tpl' => 'front.tpl.php',
+		  'args' => array('front'),
+		),
+		'page' => array(
+		  'tpl' => 'page.tpl.php',
+		  'args' => array('content'),
+		),
+		'file' => array(
+		  'tpl' => 'file.tpl.php',
+		  'args' => array('file'),
+		),
+		'item_list' => array(
+		  'fun' => 'theme_item_list',
+      'args' => array('items', 'title', 'type', 'attributes'),
+		),
+		'breadcrumb' => array(
+      'fun' => 'theme_breadcrumb',
+      'args' => array('breadcrumb'),
+		),
+    'help' => array(
+      'fun' => 'theme_help',
+      'args' => array('help'),
+    ),
+		'table' => array(
+		  'fun' => 'theme_table',
+      'args' => array('header', 'rows', 'attributes'),
+		),
+  );
+}
+
+/**
+ * @Implement of hook_module_core_module()
+ */
+function system_module_core_module() {
+  return array('system', 'user', 'block', 'field');
+}
+
+/**
+ * @Implement of hook_cron()
+ */
+function system_cron($timestamp) {
+  system_status_update('cron'); // 检查核心程序更新
+
+  // 清除过期缓存
+  db_exec('DELETE FROM {cache} WHERE expire != 0 AND expire < ?', array($_SERVER['REQUEST_TIME']));
+  db_exec('DELETE FROM {cache_page} WHERE expire != 0 AND expire < ?', array($_SERVER['REQUEST_TIME']));
+  db_exec('DELETE FROM {cache_menu} WHERE expire != 0 AND expire < ?', array($_SERVER['REQUEST_TIME']));
+  db_exec('DELETE FROM {cache_form} WHERE expire != 0 AND expire < ?', array($_SERVER['REQUEST_TIME']));
+  
+  // 清除 status < 1 的文件，每次清理 500 条记录
+  if ($fetch = db_query('SELECT fid, filepath FROM {files} WHERE status < 1', NULL, array('limit' => 500))) {
+    foreach ($fetch as $o) {
+      file_delete($o->fid, 1, $o->filepath);
+    }
+  }
+  
+  // 清理过期文件，storage 表中不存在的条目，则视为过期
+  
+  $path = file_directory_path() . '/storage';
+  if (is_dir($path)) {
+    $d = dir($path);
+    if ($fetch = db_query('SELECT id FROM {storage}')) {
+      foreach ($fetch as $o) {
+        $ids[$o->id] = $o->id;
+      }
+    }
+    while (false !== ($entry = $d->read())) {
+      $filepath = $path . '/'. $entry;
+      if (is_file($filepath)) {
+        $a = explode('.', $entry, 2);
+        if (!$ids[$a[0]]) {
+          file_delete_file($filepath, $a[0]);
+        }
+      }
+    }
+    $d->close();
+  }
+  
+  // 清除访问记录
+  if (var_get('history_enabled', 0) && $limit = var_get('history_enabled_limit', 100000)) {
+    if ($hid = db_query('SELECT hid FROM {history} ORDER BY hid DESC',
+      array(), array('limit' => array($limit, 1), 'return' => 'column'))){
+      $count = db_exec('DELETE FROM {history} WHERE hid < ?', array($hid));
+      dd_log('cron', t('system', '清除访问记录 !count 条', array('!count' => $count)));
+    } 
+  }
+  
+  // 清除系统日志
+  if ($limit = var_get('logs_enabled_limit', 100000)) {
+    if ($sid = db_query('SELECT sid FROM {logs} ORDER BY sid DESC',
+      array(), array('limit' => array($limit, 1), 'return' => 'column'))){
+      $count = db_exec('DELETE FROM {logs} WHERE sid < ?', array($sid));
+      dd_log('cron', t('system', '清除系统日志 !count 条', array('!count' => $count)));
+    } 
+  }
+  
+}
+
+/**
+ * 语言切换 
+ * @param bool $html
+ *  返回 html，或一个可用于 item_list 的数组
+ * @access public
+ * @return string|array
+ */
+function system_get_lang_change_link($html = true) {
+  global $conf, $user, $language_code; 
+
+  if (!empty($conf['languages']) && user_access('system lang change') && count($conf['languages']) > 1) {
+    $links = array();
+    foreach ($conf['languages'] as $key => $name) {
+      if ($key != $language_code) {
+        $class = 'dd_lang_link_icon dd_lang_link_icon_' . $key;
+      } else {
+        $class = 'dd_lang_link_icon dd_lang_link_icon_' . $key . ' dd_lang_link_icon_active';
+      }
+
+      $links[] = l($name, 'ajax', array(
+        'query' => 'module=system&op=lang_change&lang=' . $key . '&redirect=' . url($_GET['q']),
+        'attributes' => array('class' => $class),
+      ));
+    }
+    return $html ? theme('item_list', $links, NULL, 'ul', array('class' => 'dd_item_lang_change')) : $links;
+  }
+}
+
+/**
+ * @Implement of hook_logs_info()
+ */
+function system_logs_info() {
+  return array(
+    'cron' => t('system', '计划任务'),
+    'cron_info' => t('system', '计划任务详情'),
+    'cron_timeout' => t('system', '任务超时提醒'),
+  );
+}
+
+/**
+ * @Implement of hook_field_call_group()
+ */
+function system_field_call_group($type = NULL) {
+  $groups = array(
+    'menu' => array(
+    	'title' => t('system', '自定义主导航'),
+      'sum' => 10, // 最多允许 10 个导航
+      'disable_import' => true,
+      'type' => array('select'), // 只允许下拉选择项
+    	'level' => 3, // 分类层级级数，0 则为不限制(实际最多 10 级)
+    )
+  );
+  return $type ? $groups[$type] : $groups;
+}
+
+/**
+ * @Implement of hook_field_call_form()
+ */
+function system_field_call_form(&$field, &$form) {
+  if ($field->module != 'system') return;
+
+  $form['fields']['data']['#weight'] = -10;
+  $form['fields']['data']['path'] = array(
+    '#title' => t('system', '路径'),
+    '#type' => 'textfield',
+    '#weight' => -100,
+    '#default_value' => $field->data['path'],
+    '#description' => t('system', '站内或站外链接均可，可使用 user、system <a href="!url">通配符</a>', array('!url' => url('admin/token'))),
+    '#required' => 1,
+  );
+
+  $form['fields']['data']['target'] = array(
+    '#title' => t('system', '窗口'),
+    '#type' => 'radio',
+    '#weight' => -90,
+    '#options' => array(
+      '_blank' => t('system', '新窗口'),
+      0 => t('system', '原窗口'),
+    ),
+    '#default_value' => !empty($field->data['target']) ? $field->data['target'] : 0,
+    '#description' => t('system', '链接的打开方式'),
+    '#required' => 1,
+  );
+
+  $form['fields']['weight']['#type'] = 'textfield';
+  $form['fields']['weight']['#attributes']['class'] = '{number: true}';
+  $form['fields']['weight']['#description'] = t('system', '只能是正负整数');
+
+  unset($form['fields']['_field_type'], $form['fields']['required'], $form['fields']['data']['description']);
+  
+  $access = $form['fields']['access']['view'];
+  $form['fields']['access'] = array();
+  $access['#title'] = t('system', '权限');
+  $access['#description'] = t('system', '设置可见该导航的用户组');
+  $form['fields']['access']['view'] = $access;
+
+  $form['fields']['data']['input_description']['#title'] = t('system', '描述');
+  $form['fields']['data']['input_description']['#description'] = t('system', '该导航的描述');
+}
+
+/**
+ * @Implement of hook_field_call_term_form()
+ */
+function system_field_call_term_form(&$form, &$field, &$term) {
+  if ($field->module != 'system') return;
+ // $form['fields']['_pid'] = array(
+ //   '#title' => t('system', '上级'),
+ //   '#weight' => -100,
+ //   '#value' => $form['fields']['pid']['#options'][0],
+ // );
+
+ // $form['fields']['pid'] = array(
+ //   '#type' => 'hidden',
+ //   '#default_value' => 0,
+ //   '#constant' => 1
+ // );
+
+  $form['fields']['description'] = array('#weight' => -1);
+
+  $form['fields']['description']['path'] = array(
+    '#title' => t('system', '路径'),
+    '#type' => 'textfield',
+    '#default_value' => $term->description['path'],
+    '#description' => t('system', '站内或站外链接均可，可使用 user、system <a href="!url">通配符</a>', array('!url' => url('admin/token'))),
+    '#required' => 1,
+  );
+
+  $form['fields']['description']['description'] = array(
+    '#title' => t('system', '描述'),
+    '#type' => 'textfield',
+    '#default_value' => $term->description['description'],
+    '#description' => t('system', '该导航的描述'),
+  );
+
+  $form['fields']['weight']['#type'] = 'textfield';
+  $form['fields']['weight']['#weight'] = 1;
+  $form['fields']['weight']['#attributes']['class'] = '{number: true}';
+  $form['fields']['weight']['#description'] = t('system', '只能是正负整数');
+}
+
+/**
+ * @Implement of hook_field_call_term_validate()
+ */
+function system_field_call_term_validate($field, $term) {
+  if ($field->module != 'system') return;
+  $term->description = serialize($term->description);
+}
+
+/**
+ * @Implement of hook_field_call_term_load()
+ */
+function system_field_call_term_load($field, $term) {
+  if ($field->module != 'system') return;
+  $term->description = unserialize($term->description);
+}
+
+/**
+ * @Implement of hook_field_call_links()
+ */
+function system_field_call_links($field, &$links) {
+  if ($field->module != 'system') return;
+  unset($links['export']);
+}
+
+/**
+ * @Implement of hook_site_menu()
+ */
+function system_site_menu(&$menu) {
+  // 自定义主导航
+  if (!$datas = field_get_cache_field_group('system', 'menu')) return;
+
+  // 子导航
+  $term = field_get_cache_term('system', 'menu');
+  foreach ($datas as $field) {
+    if (field_access('view', $field)) {
+      $att = array();
+      if (!empty($field->data['input_description'])) {
+        $att = array('attributes' => array('title' => $field->data['input_description']));
+      }
+      
+      if (!empty($field->data['target'])) {
+        $att['attributes']['target'] = '_blank';
+      }
+
+      $menu['system_' . $field->field_key] = array(
+        '#data' => l($field->name, dd_get_token($field->data['path'], NULL, array('user', 'system')), $att),
+        '#weight' => $field->weight,
+      );
+
+      if (!empty($term[$field->field_id])) {
+        $menu['system_' . $field->field_key]['#childrens'] = array();
+        $terms = field_get_cache_term_key('system', 'menu', $field->field_key);
+        foreach ($term[$field->field_id] as $o) {
+          $d = unserialize($o->description);
+          if (!empty($d['description'])) {
+            $att = array('attributes' => array('title' => $d['description']));
+          } else {
+            $att = array();
+          }
+          $menu['system_' . $field->field_key]['#childrens'][] = array(
+            '#data' => l($o->name,  dd_get_token($d['path'], NULL, array('user', 'system')), $att),
+            '#childrens' => _system_get_custom_menu_childrens($o->tid, $terms),
+            '#weight' => $o->weight
+          );
+        }
+      }
+    }
+  }
+}
+
+// protected _system_get_custom_menu_childrens($tid, $terms) {{{ 
+/**
+ * _system_get_custom_menu_childrens
+ *  解析自定义主导航的子级
+ * 
+ * @param int $tid 
+ * @param object $terms 
+ * @access protected
+ * @return array
+ */
+function _system_get_custom_menu_childrens($tid, $terms) {
+  $data = array();
+
+  foreach ($terms as $o) {
+    if ($o->pid == $tid) {
+      $d = unserialize($o->description);
+      if (!empty($d['description'])) {
+        $att = array('attributes' => array('title' => $d['description']));
+      } else {
+        $att = array();
+      }
+      $data[] = array(
+        '#data' => l($o->name,  dd_get_token($d['path'], NULL, array('user', 'system')), $att),
+        '#weight' => $o->weight,
+        '#childrens' => _system_get_custom_menu_childrens($o->tid, $terms),
+      );
+    }
+  }
+
+  return $data;
+}
+// }}}
+
+/**
+ * 文件删除、更新、浏览操作
+ */
+function file_operate($file, $op) {
+  switch ($op) {
+    case 'view':
+      module_include_file('system.file.inc', 'system');
+    return _system_file_view($file);
+    case 'delete':
+      if (strpos($file->filemime, 'image') !== false) {
+        $thumb = 1;
+      }
+      if (file_delete($file->fid, $thumb, $file->filepath)) {
+        module_invoke_all('file_delete', $file);
+        echo 1;
+        exit;
+      }
+    break;
+  }
+}
+
+/**
+ * 文件权限验证
+ */
+function file_is_access($file, $op = 'view') {
+  global $user;
+
+  $type = 'is_' . $op;
+
+  $file->$type = false;
+
+  if ($op == 'view') {
+    if (!empty($file->status)) {
+      $file->$type= user_access('file all ' . $op) || (user_access('file one ' . $op) && $file->uid == $user->uid);
+    } else {
+      $file->$type = $file->uid == $user->uid;
+    }
+  } else {
+    $file->$type = user_access('file all ' . $op) || (user_access('file one ' . $op) && $file->uid == $user->uid);
+  }
+  
+  /**
+   * 触发 hook_file_access_is_$op()，若将 $file->$type 设置为 false，则不允许执行操作(view/update/delete)
+   */
+  module_invoke_all('file_access_is_' . $op, $file);
+
+  return $file->$type;
+}
+
+

@@ -1,0 +1,733 @@
+/*$Id$*/
+body {
+  padding-top: 50px;
+  position: relative;
+}
+
+a:hover, a:active, a.active {
+  color: #2A6496;
+}
+
+ul.site_menu_children {
+  display: none;
+}
+
+.navbar-nav > li > a {
+  padding: 15px 10px;
+}
+
+#header .navbar-brand {
+  padding: 5px 0;
+  margin: 0;
+}
+
+#header .logo img {
+  _height: 40px;
+  *height: 40px;
+  max-height: 40px;
+}
+
+#main {
+  margin-top: 10px;
+}
+
+#footer {
+  background-color: #F5F5F5;
+  border-top: 1px solid #E5E5E5;
+  margin-top: 20px;
+  padding: 30px 0;
+  color: #777777;
+  text-align: center;
+  width: 100%;
+}
+
+.dd_item_lang_change {
+  text-align: center;
+}
+
+/*table*/
+.table > thead > tr > th,
+.table > tbody > tr > th,
+.table > tfoot > tr > th,
+.table > thead > tr > td,
+.table > tbody > tr > td,
+.table > tfoot > tr > td {
+  vertical-align: middle;
+}
+
+table select {
+  margin-bottom: 0;
+}
+
+.table > caption + thead > tr:first-child > th,
+.table > colgroup + thead > tr:first-child > th,
+.table > thead:first-child > tr:first-child > th {
+  border-bottom: none;
+}
+
+.table th, .table td {
+  vertical-align: inherit;
+}
+
+.even, thead {
+  background: #F9F9F9;
+}
+
+#user_admin_roles_table,
+#user_admin_roles_table th {
+  text-align: center;
+}
+
+th.user_admin_roles_name {
+  width: 80px;
+}
+
+th.user_admin_roles_count {
+  width: 60px;
+}
+
+th.user_admin_roles_op {
+  width: 100px;
+}
+
+#user_set_perm  td.user_admin_role_module {
+  font-weight: bold;
+  text-align: center;
+  font-size: 1.2em;
+}
+
+.admin_themes_table th.path {
+  width: 35%;
+}
+
+.admin_themes_table th,
+.admin_themes_table td {
+  text-align: center;
+}
+
+#system_modules_page th,
+#system_modules_page td {
+  text-align: center;
+}
+
+#system_modules_page td .item-list {
+  text-align: left;
+}
+
+td.table_submit {
+  text-align: right;
+}
+
+#system_modules_page th.description {
+  width: 45%;
+}
+
+#system_modules_page th.info {
+  width: 40%;
+}
+
+#system_cache_clear .checkbox_field_value {
+  display: block;
+}
+
+#system_cache_clear .checkbox_field_value + .checkbox_field_value {
+  margin-left: 0;
+}
+
+#dd_database_debug .dd_database_debug_args2,
+#dd_database_debug .dd_database_debug_args1 {
+  width: 30%;
+}
+
+.pager .pager_form_go_input {
+  width: 35px;
+  text-align: center;
+  margin: 0;
+}
+
+.pager li > a, .pager li > span {
+  padding: 3px 8px;
+}
+
+/*misc*/
+ul.nav-tabs, ul#sub_tabs {
+  margin-bottom: 8px;
+}
+
+.right {
+  text-align: right;
+}
+
+.left {
+  text-align: left;
+}
+
+.center {
+  text-align: center;
+}
+
+label {
+  display: inline;
+}
+
+.center_table th,
+.center_table td {
+  text-align: center;
+}
+
+.table_fixed_header_wrapper_clone {
+  height: 40px;
+  line-height: 40px;
+  z-index: 9999;
+  text-align: left;
+}
+
+.table_fixed_header_wrapper {
+  position: relative;
+  overflow: auto;
+  z-index: 1000;
+}
+
+.table_fixed_header_wrapper_clone table, 
+.table_fixed_header_wrapper table {
+  max-width: none;
+}
+
+.system_no_content {
+  text-align: center;
+}
+
+li {
+  list-style: none outside none;
+}
+
+span.form_error,
+#ajax_description,
+.error {
+  color: #FF0000;
+}
+
+#ajax_description {
+  padding: 5px 0;
+}
+
+.ext_sort_order {
+  padding: 0 5px;
+}
+
+.sort_active_desc {
+	padding-right: 14px;
+  background: url(/misc/images/arrow-desc.png) right 0 no-repeat;
+}
+
+.sort_active_asc {
+	padding-right: 16px;
+  background: url(/misc/images/arrow-asc.png) right 0 no-repeat;
+}
+
+/*fieldset*/
+fieldset {
+  margin: 10px 0;
+  padding: 0;
+  border: 1px solid #CCCCCC;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.075) inset;
+  transition: border 0.2s linear 0s, box-shadow 0.2s linear 0s
+}
+
+fieldset.fieldset-hide {
+  border: none;
+  border-top: 1px solid #CCCCCC;
+}
+
+.fieldset-wrapper {
+  padding: 5px;
+}
+
+legend {
+  line-height: normal;
+  width: auto;
+  padding: 0 0 0 16px;
+  margin: 0 0 0;
+  font-weight: bold;
+  font-size: 12px;
+  border: none;
+}
+
+legend.desc {
+  background: url(/misc/images/arrow-desc.png) left 0 no-repeat;
+}
+
+legend.asc {
+  background: url(/misc/images/arrow-asc.png) left 0 no-repeat;
+}
+
+.ui-datepicker select.ui-datepicker-month, .ui-datepicker select.ui-datepicker-year {
+  width: 40%;
+}
+
+.js_messageShow {
+  position: fixed;
+  top: 50px;
+  right: 45%;
+  _position: absolute;
+  padding: 30px 100px;
+  border: 1px solid #ccc;
+  background: #fff;
+  z-index: 100;
+}
+
+/*form*/
+input.form_textfield_name_title {
+  width: 550px;
+}
+
+form .form_item {
+  margin: 5px 0;
+}
+
+.radio, .checkbox {
+  display: inline;
+}
+
+span.option_label,
+span.form_radio_text {
+  cursor: pointer;
+}
+
+select {
+  width: auto;
+}
+
+input.error,
+input.error:focus {
+  border-color: #B94A48;
+}
+
+textarea,
+select,
+input[type="text"],
+input[type="password"],
+input[type="datetime"],
+input[type="datetime-local"],
+input[type="date"],
+input[type="month"],
+input[type="time"],
+input[type="week"],
+input[type="number"],
+input[type="email"],
+input[type="url"],
+input[type="search"],
+input[type="tel"],
+input[type="color"],
+.uneditable-input {
+  background-color: #FFFFFF;
+  background-image: none;
+  border: 1px solid #CCCCCC;
+  border-radius: 4px;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.075) inset;
+  color: #555555;
+  font-size: 14px;
+  height: 34px;
+  line-height: 1.42857;
+  padding: 6px 12px;
+  transition: border-color 0.15s ease-in-out 0s, box-shadow 0.15s ease-in-out 0s;
+  vertical-align: middle;
+}
+
+input[type="file"] {
+  display: inline;
+}
+
+textarea {
+  min-height: 200px;
+  width: 98%;
+}
+
+.form_value_textarea {
+  width: 98%;
+}
+
+textarea:focus,
+input[type="text"]:focus,
+input[type="password"]:focus,
+input[type="datetime"]:focus,
+input[type="datetime-local"]:focus,
+input[type="date"]:focus,
+input[type="month"]:focus,
+input[type="time"]:focus,
+input[type="week"]:focus,
+input[type="number"]:focus,
+input[type="email"]:focus,
+input[type="url"]:focus,
+input[type="search"]:focus,
+input[type="tel"]:focus,
+input[type="color"]:focus,
+select:focus,
+.uneditable-input:focus {
+  border-color: #66AFE9;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.075) inset, 0 0 8px rgba(102, 175, 233, 0.6);
+  outline: 0 none;
+}
+
+button, input, select, textarea {
+  vertical-align: baseline;
+}
+
+label.form_required {
+  color: #588658;
+}
+
+.dd_label {
+  color: #365A36;
+}
+
+.radio.inline, .checkbox.inline {
+  padding-top: 0;
+}
+
+.radio, .checkbox {
+  min-height: inherit;
+  padding-left: 5px;
+}
+
+.form_description_format {
+  display: block;
+}
+
+.radio_field_format + .radio_field_format {
+  display: block;
+  margin-left: 0;
+}
+
+.form_value_textfield {
+  width: 260px;
+}
+
+span.form_error span {
+  padding: 0 3px;
+}
+
+#form_admin_search {
+  margin: 5px 0;
+}
+
+#form_admin_search input {
+  margin: 0 3px;
+}
+
+span.form_error,
+span.form_error span,
+.form_item_textfield .error,
+.dd_label_value,
+.dd_label_select,
+.dd_label_file,
+.dd_label_weight,
+.dd_label_password,
+.dd_label_radio,
+.dd_label_textfield,
+.dd_label_checkbox {
+  display: inline;
+}
+
+.form_description {
+  color: #7E8186;
+  padding: 0 4px;
+}
+
+.add-on {
+  padding: 0 3px;
+  color: #777;
+}
+
+#user_admin_new_pass .dd_label,
+#user_admin_edit_form .dd_label,
+#content_admin_type_form .dd_label,
+.dd_get_form_meta_fields .dd_label,
+#system_site_error .dd_label,
+#user_set_settings .dd_label,
+#_user_center_newpass .dd_label,
+#user_edit_form .dd_label,
+#editor_admin_form .dd_label,
+#system_site_settings .dd_label {
+  display:-moz-inline-box;
+  display:inline-block;
+  width: 140px;
+  text-align: right;
+}
+
+#content_admin_type_form .dd_label,
+.dd_get_form_meta_fields .dd_label,
+#system_site_error .dd_label,
+#editor_admin_form .dd_label {
+  width: 120px;
+  text-align: left;
+}
+
+#system_site_settings_type_submit,
+#user_admin_new_pass_type_button,
+#user_admin_edit_form_type_submit,
+#user_set_settings_type_submit,
+#_user_center_newpass_submit,
+#user_edit_form_submit {
+  margin-left: 140px;
+}
+
+#system_site_settings_admin_language .form_description {
+  display: block;
+  padding: 0;
+  margin-left: 140px;
+}
+
+#editor_admin_form .fieldset-wrapper .dd_label {
+  width: 60px;
+  margin: 0 5px;
+}
+
+#editor_admin_settings div {
+  display: inline;
+  margin-left: 5px;
+}
+
+.block h3.block_title {
+  padding: 4px 0;
+}
+
+.block #user_login_form {
+  padding: 8px 0;
+}
+
+#user_login_form .textfield,
+#user_login_form .password {
+  width: 150px;
+}
+
+.block #user_login_form label.error,
+.block #user_login_form .form_description {
+  display: block;
+  text-align: right;
+}
+
+.block #user_login_form_submit {
+  text-align: right;
+  margin-right: 5px;
+}
+
+#print .user_login_form #user_login_form_type_submit,
+.block #user_login_form_type_submit {
+  margin-right: 5px;
+}
+
+#print .user_login_form {
+  width: 550px;
+  margin: 0 auto;
+
+}
+
+#user_login_form_submit {
+  padding-left: 42px;
+}
+
+#user_login_form_submit .checkbox_field_his {
+  margin-right: 10px;
+  line-height: 35px;
+  float: left;
+}
+
+#user_login_form_submit .checkbox_field_his input {
+  margin-top: 10px;
+}
+
+/*block*/
+.sidebar .block {
+  border-radius: 4px;
+  border: 1px solid #CCCCCC;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.075) inset;
+  transition: border 0.2s linear 0s, box-shadow 0.2s linear 0s;
+  margin-bottom: 8px;
+}
+
+.block .block_content {
+  padding: 0 5px;
+}
+
+.sidebar .block h3.block_title {
+  text-align: center;
+  border-bottom: 1px solid #CCCCCC;
+  margin: 0;
+}
+
+#block_system_adminLink .item_click_op {
+	background: url(/misc/images/arrow-desc.png) right center no-repeat;
+	float: right;
+	display: block;
+	width: 13px;
+  height: 26px;
+  line-height: 26px;
+  cursor: pointer;
+}
+
+#block_system_adminLink .item-list-hide {
+  background: url(/misc/images/arrow-asc.png) right center no-repeat;
+}
+
+#block_system_adminLink .item-list h3 {
+  line-height: 28px;
+  font-size: 16px;
+  margin: 0 0 5px 0;
+  border-bottom: 1px solid #ccc;
+  cursor: crosshair;
+}
+
+#block_system_adminLink .dida_sorttable_button {
+  text-align: center;
+  padding: 10px 0;
+  background: #D9EDF7;
+  border: #BCE8F1;
+  border-radius: 4px;
+}
+
+.system_admin_block_link_remove {
+  display: block;
+  text-align: right;
+  color:#CC6600;
+  cursor: pointer;
+}
+
+#block_system_adminLink .item_admin_menus a {
+  padding: 3px 0 3px 25px;
+  display: block;
+}
+
+#block_system_adminLink .item_admin_menus a.active {
+  text-align: right;
+  margin: 0;
+  padding: 5px 0;
+  color: #FFFFFF;
+  background-color: #0088CC;
+}
+
+#system_admin_menu_list_didaSystemCustom ul.admin_menus {
+  padding: 3px 0;
+  margin: 3px;
+}
+
+#system_admin_menu_list_didaSystemCustom ul.admin_menus li.last {
+  border-top: 1px solid #ccc;
+  margin: 3px 0;
+  padding: 3px 0;
+}
+
+#system_admin_menu_list_didaSystemCustom ul.admin_menus #admin_custom_add_form input {
+  display: block;
+  width: 100%;
+  margin: 3px 0;
+}
+
+#block_admin_form_submit,
+#block_admin_form .block_item {
+  clear: both;
+}
+
+#block_admin_form .block_item label,
+#block_admin_form .block_item ul,
+#block_admin_form .block_item span,
+#block_admin_form .block_item input,
+#block_admin_form .block_item li,
+#block_admin_form .block_item div,
+#block_admin_form .block_item select {
+  float: left;
+  padding: 0 4px;
+}
+
+#block_admin_form .block_item div.title {
+  font-weight: bold;
+  font-size: 14px;
+  color: #000000;
+  width: 120px;
+}
+  
+#block_admin_form .block_item a {
+  padding: 0 3px;
+}
+
+#block_admin_form .block_item {
+  overflow: hidden;
+  margin: 5px 0;
+  border-bottom: 1px solid #DDDDDD;
+}
+
+.markItUp {
+  width: 100%;
+}
+
+/*comment*/
+#comment_form textarea, #comment_form .collapsible {
+  width: 65%;
+  padding: 5px;
+}
+
+#comment_form #weibo_tweet_form_type_tweet,
+#weibo_tweet_form_type_tweet {
+  width: 98%;
+}
+
+#comment_form_type_title {
+  width: 55%;
+}
+
+/*content*/
+.content_view_content_header {
+  font-size: 12px;
+  color: #666;
+  padding: 5px 0;
+  border-bottom: 1px solid #ddd;
+  text-align: right;
+}
+
+/*field*/
+.content_view_content_fields {
+  margin: 5px 0;
+  border-bottom: 1px solid #ddd;
+}
+
+#field_export_content_view {
+  width: 99%;
+  height: 350px;
+}
+
+/*user center*/
+#user-center {
+  overflow: hidden;
+  height: auto;
+}
+
+#user-center-header {
+  text-align: right;
+  border-bottom:1px solid #ccc;
+  padding-right: 5px;
+  margin: 0;
+}
+
+#user-center-link {
+  text-align: center;
+  float: left;
+  padding: 0;
+  width: 18%;
+}
+
+#user-center-body {
+  border-left: 1px solid #ccc;
+  min-height: 200px;
+  padding: 5px;
+  width: 80%;
+  float: left;
+}
+
+.item_user_center_link_item {
+  border-bottom: 1px solid #ccc;
+}
+
+.item_user_center_link_item h3 {
+  border-bottom: 1px solid #eee;
+}
+

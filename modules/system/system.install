@@ -1,0 +1,1157 @@
+<?php
+// $Id$
+
+/**
+ * @Implement of hook_update_x()
+ *  filter_tags.delta 字段类型修改
+ */
+function system_update_11() {
+  // 将 delta 长度改为 32
+  return db_change_field('filter_tags', 'delta', 'delta', array(
+    'type' => 'varchar',
+    'length' => 32,
+    'not null' => TRUE,
+    'default' => '',
+    'description' => '基于的过滤规则在其模块内部编号',
+  ));
+}
+
+/**
+ * @Implement of hook_update_x()
+ *  filters.delta 字段类型修改
+ */
+function system_update_10() {
+  // 将 delta 长度改为 32
+  return db_change_field('filters', 'delta', 'delta', array(
+    'type' => 'varchar',
+    'length' => 32,
+    'not null' => TRUE,
+    'default' => '',
+    'description' => '过滤器在模块内部编号',
+  ));
+}
+
+/**
+ * @Implement of hook_update_X()
+ */
+function system_update_9() {
+  // 将 cron 上次执行时间戳从 cache 表中移入 custom，修复清除缓存后所有 cron 会重新执行的问题
+  if ($cache = cache_get('dida_cron_last_timestamps')) {
+    $data = $cache->data;
+  } else {
+    $data = array();
+  }
+
+  custom_set('dida_cron_last_timestamps', $data);
+
+  return array(t('system', '将 cron 上次执行时间记录到 custom 表成功'));
+}
+
+/**
+ * @Implement of hook_update_X()
+ *  修改文本日志类型，从 txt 改为 php，防止被下载
+ */
+function system_update_8() {
+  $ret = array(t('system', '修复日志文件安全问题'));
+
+  if ($fetch = glob(DIDA_ROOT . '/sites/logs/*')) {
+    $content = '<?php exit; ?>';
+    $strlen = strlen($content);
+    foreach ($fetch as $file) {
+      if (is_file($file)) {
+        $f = fopen($file, 'rb+');
+        if ($f !== false) {
+          fwrite($f, $content, $strlen); 
+          fclose($f); 
+          if (rename($file, $file . '.php')) {
+            $ret[] = t('system', '!file 修复完成', array('!file' => $file));
+            continue;
+          }
+        }
+        $ret[] = t('system', '!file 无法读写，请立即手动删除，以保障系统安全！', array('!file' => $file));
+      }
+    }
+  }
+  
+  $ret[] = t('system', '日志修复结束');
+
+  return $ret;
+}
+
+/**
+ * @Implement of hook_update_x()
+ *  filters.delta 字段类型修改
+ */
+function system_update_7() {
+  // 将 delta 由 int 改为 varchar，便于编码
+
+  if ($ret = db_change_field('filters', 'delta', 'delta', array(
+    'type' => 'varchar',
+    'length' => 12,
+    'not null' => TRUE,
+    'default' => '',
+    'description' => '过滤器在模块内部编号',
+  ))) {
+    // html 标签过滤器 delta 由 0 更改为 html
+    db_exec('UPDATE {filters} SET delta = ? WHERE module = ? AND delta = 0',
+    array('html', 'system'));
+
+    // 换行符转换为 br 过滤器 delta 由 1 更改为 br
+    db_exec('UPDATE {filters} SET delta = ? WHERE module = ? AND delta = 1',
+    array('br', 'system'));
+
+    // php 代码解析过滤器 delta 由 2 更改为 php
+    db_exec('UPDATE {filters} SET delta = ? WHERE module = ? AND delta = 2',
+    array('php', 'system'));
+
+    // 代码高亮过滤器 delta 由 3 更改为 highlighter
+    db_exec('UPDATE {filters} SET delta = ? WHERE module = ? AND delta = 3',
+    array('highlighter', 'system'));
+
+    // 表情解析过滤器 delta 由 4 更改为 smiley
+    db_exec('UPDATE {filters} SET delta = ? WHERE module = ? AND delta = 4',
+    array('smiley', 'system'));
+
+  }
+
+  if ($ret = db_change_field('filter_tags', 'delta', 'delta', array(
+    'type' => 'varchar',
+    'length' => 32,
+    'not null' => TRUE,
+    'default' => '',
+    'description' => '基于的过滤规则在其模块内部编号',
+  ))) {
+    // delta 修改为 fid
+    db_exec('UPDATE {filter_tags} SET delta = fid WHERE module = ?', array('system'));
+  }
+  
+  return $ret;
+}
+
+/**
+ * @Implement of hook_update_x()
+ *  增加表 cache_filte，用于输入格式缓存
+ */
+function system_update_6(){
+  $ret = array();
+  
+  if ($cache_filter = module_get_table('system', 'cache')) {
+    $ret = db_create_table('cache_filter', $cache_filter);
+  }
+  
+  return $ret;
+}
+
+/**
+ * @Implement of hook_update_x()
+ *  增加表 history，用做记录浏览历史
+ */
+function system_update_5(){
+  $ret = array();
+  
+  if($history = module_get_table('system', 'history')){
+    $ret = db_create_table('history', $history);
+  }
+  
+  return $ret;
+}
+
+/**
+ * @Implement of hook_update_x()
+ *  storage 表增加一个扩展 id
+ */
+function system_update_4(){
+  $ext_id = array(
+    'type' => 'int',
+    'not null' => TRUE,
+    'default' => 0,
+    'description' => '扩展 id'
+  );
+  
+  $ret = db_add_field('storage', 'ext_id', $ext_id);
+  
+  return $ret;
+}
+
+/**
+ * @Implement of hook_update_x()
+ *  添加 cache_page_list 表，用于生成静态
+ */
+function system_update_3(){
+  $ret = array();
+  
+  if($cache_page_list = module_get_table('system', 'cache_page_list')){
+    $ret = db_create_table('cache_page_list', $cache_page_list);
+  }
+  
+  return $ret;
+}
+
+/**
+ * @Implement of hook_update_x()
+ *  添加 storage 表，可方便的用于首页、频道等定制
+ */
+function system_update_2(){
+  $ret = array();
+  
+  if($storage = module_get_table('system', 'storage')){
+    $ret = db_create_table('storage', $storage);
+  }
+  
+  return $ret;
+}
+
+/**
+ * @Implement of hook_update_x()
+ *  logs 表增加一个扩展 id，删除多个索引
+ */
+function system_update_1(){
+  db_drop_index('logs', 'uid');
+  db_drop_index('logs', 'status');
+  db_drop_index('logs', 'timestamp');
+  $ext_id = array(
+    'type' => 'int',
+    'not null' => TRUE,
+    'unsigned' => TRUE,
+    'default' => 0,
+    'description' => '扩展 id'
+  );
+  
+  $ret = db_add_field('logs', 'ext_id', $ext_id);
+  db_add_index('logs', 'tex', array('type', 'ext_id'));
+  
+  return $ret;
+}
+
+//注册模块时创建的数据表，调用接口函数 hook_schema
+function system_schema() {
+  $schema['variable'] = array(
+    'description' => '系统配置表',
+    'fields' => array(
+      'name' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => '名称'
+      ),
+      'value' => array(
+        'type' => 'text',
+        'not null' => TRUE,
+        'size' => 'big',
+        'serialize' => true,
+        'description' => '内容'
+      )
+    ),
+    'primary key' => array('name'),
+  );
+  
+  $schema['custom'] = $schema['variable'];
+  $schema['custom']['description'] = '定制数据，供模块使用';
+  
+  $schema['storage'] = array(
+    'description' => '自定义存储表',
+    'fields' => array(
+      'id' => array(
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'ext_id' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => '扩展 id'
+      ),
+      'ext_type' => array(
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => '扩展类型1'
+      ),
+      'ext_type2' => array(
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => '扩展类型2'
+      ),
+      'weight' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => '权重'
+      ),
+      'timestamp' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => '时间'
+      ),
+      'data' => array(
+        'type' => 'text',
+        'not null' => TRUE,
+        'size' => 'big',
+        'serialize' => true,
+        'description' => '内容'
+      )
+    ),
+    'indexes' => array(
+      'ewt' => array('ext_type', 'weight', 'timestamp'),
+    ),
+    'primary key' => array('id'),
+  );
+  
+  $schema['files'] = array(
+    'description' => '文件表',
+    'fields' => array(
+    	'fid' => array(
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'description' => '文件 id，主键自增'
+      ),
+    	'uid' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => '上传者 uid'
+      ),
+    	'ext_id' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => '扩展字段'
+      ),
+    	'ext_id2' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => '扩展字段'
+      ),
+    	'ext_type' => array(
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => '扩展字段'
+      ),
+      'filename' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => '文件名'
+      ),
+      'filepath' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'description' => '文件物理位置'
+      ),
+      'filemime' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'description' => '文件类型'
+      ),
+      'filesize' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'description' => '文件大小'
+      ),
+      'status' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 1,
+        'size' => 'tiny',
+        'description' => '0：未发布，1：已发布',
+      ),
+      'timestamp' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'description' => '时间戳'
+      ),
+      'filebody' => array(
+        'type' => 'text',
+        'not null' => FALSE,
+        'size' => 'medium',
+        'description' => '文件描述',
+      ),
+    ),
+    'indexes' => array(
+    	'uid' => array('uid'),
+      'status' => array('status'),
+      'file_type_id' => array('ext_type', 'ext_id', 'ext_id2'),
+      'file_type' => array(array('ext_type', 12)),
+      'timestamp' => array('timestamp'),
+    ),
+    'primary key' => array('fid'),
+  );
+  $schema['menu'] = array(
+    'description' => 'menu注册表',
+    'fields' => array(
+      'path' => array(
+        'description' => '主键，唯一',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => ''
+      ),
+      'module' => array(
+        'description' => '注册路径的模块名',
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => TRUE,
+        'default' => ''
+      ),
+      'title' => array(
+        'description' => '页面标题，优先级低于 dc_set_title 赋值',
+        'type' => 'varchar',
+        'length' => 128,
+        'not null' => false,
+        'default' => ''
+      ),
+      'title_callback' => array(
+        'description' => '标题回调函数，优先级低于 title',
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => false,
+        'default' => ''
+      ),
+      'title_arguments' => array(
+        'description' => '传递给标题函数的参数',
+        'type' => 'text',
+        'size' => 'medium',
+        'serialize' => true,
+        'not null' => false,
+      ),
+      'load_functions' => array(
+        'description' => '通配符调用的函数',
+        'type' => 'text',
+        'size' => 'medium',
+        'serialize' => true,
+        'not null' => false,
+      ),
+      'access_callback' => array(
+        'description' => '权限函数',
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => false,
+        'default' => ''
+      ),
+      'access_arguments' => array(
+        'description' => '传递给权限函数的参数',
+        'type' => 'text',
+        'size' => 'medium',
+        'serialize' => true,
+        'not null' => false,
+      ),
+      'page_callback' => array(
+        'description' => '页面函数',
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => true,
+        'default' => ''
+      ),
+      'page_arguments' => array(
+        'description' => '传递给页面函数的参数',
+        'type' => 'text',
+        'size' => 'medium',
+        'serialize' => true,
+        'not null' => false,
+      ),
+      'description' => array(
+        'description' => '描述',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => false,
+        'default' => ''
+      ),
+      'file' => array(
+        'description' => '包含的文件',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => false,
+        'default' => ''
+      ),
+      'fit' => array(
+        'description' => '路径宽度',
+        'type' => 'int',
+        'not null' => true,
+        'default' => 0
+      ),
+      'weight' => array(
+        'description' => '路径权重',
+        'type' => 'int',
+        'not null' => true,
+        'default' => 0
+      ),
+    ),
+    'indexes' => array('fit' => array('fit'), 'weight' => array('weight')),
+    'primary key' => array('path'),
+  );
+  $schema['cron'] = array(
+    'description' => '计划任务',
+    'fields' => array(
+      'cid' => array(
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'description' => '主键，自增'
+      ),
+      'module' => array(
+        'description' => '模块系统名称',
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => TRUE,
+        'default' => ''
+      ),
+      'status' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unsigned' => TRUE,
+        'default' => 0,
+        'size' => 'tiny',
+        'description' => '0：待执行，1、已执行',
+      ),
+      'type' => array(
+        'description' => '任务类型，模块自定义',
+        'type' => 'varchar',
+        'length' => 128,
+        'not null' => false,
+        'default' => ''
+      ),
+      'data' => array(
+        'type' => 'text',
+        'not null' => FALSE,
+        'size' => 'big',
+        'serialize' => true,
+        'description' => '任务数据'
+      ),
+      'weight' => array(
+        'description' => '任务权重',
+        'type' => 'int',
+        'not null' => true,
+        'default' => 0
+      ),
+    ),
+    'indexes' => array('status' => array('status')),
+    'primary key' => array('cid'),
+  );
+  $schema['alias'] = array(
+    'description' => '自定义路径',
+    'fields' => array(
+      'path' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => '系统路径'
+      ),
+    	'type' => array(
+        'type' => 'varchar',
+        'length' => 8,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => '扩展字段'
+      ),
+    	'tid' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => '扩展字段'
+      ),
+      'alias' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => '别名'
+      )
+     ),
+    'indexes' => array('tid' => array('type', 'tid')),
+    'unique keys' => array('alias' => array('alias')),
+    'primary key' => array('path'),
+  );
+  
+  $schema['cache'] = array(
+    'description' => '通用缓存',
+    'fields' => array(
+      'cid' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => '缓存名。主键'
+      ),
+      'data' => array(
+        'type' => 'blob',
+        'not null' => FALSE,
+        'size' => 'big',
+        'description' => '缓存内容'
+      ),
+      'expire' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unsigned' => TRUE,
+        'default' => 0,
+        'description' => '过期时间'
+      ),
+      'created' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unsigned' => TRUE,
+        'default' => 0,
+        'description' => '创建时间'
+      ),
+      'serialized' => array(
+        'type' => 'int',
+        'size' => 'small',
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => '是否序列化'
+      )
+     ),
+    'indexes' => array('expire' => array('expire')),
+    'primary key' => array('cid'),
+  );
+  
+  $schema['cache_page'] = $schema['cache'];
+  $schema['cache_page']['description'] = '页面缓存';
+  $schema['cache_menu'] = $schema['cache'];
+  $schema['cache_menu']['description'] = '路径缓存';
+  $schema['cache_form'] = $schema['cache'];
+  $schema['cache_form']['description'] = '表单缓存';
+  $schema['cache_field'] = $schema['cache'];
+  $schema['cache_field']['description'] = '字段缓存';
+  $schema['cache_filter'] = $schema['cache'];
+  $schema['cache_filter']['description'] = '输入法缓存';
+  
+  $schema['cache_page_list'] = array(
+    'description' => '静态页路径表',
+    'fields' => array(
+      'path' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => '系统路径'
+      ),
+      'dirname' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => '文件路径'
+      )
+     ),
+    'unique keys' => array('pd' => array('path', 'dirname'))
+  );
+  
+  $schema['logs'] = array(
+    'description' => '操作日志',
+    'fields' => array(
+      'sid' => array(
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'description' => '主键，自增'
+      ),
+    	'uid' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'description' => '用户 uid'
+      ),
+      'ext_id' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unsigned' => TRUE,
+        'default' => 0,
+        'description' => '扩展 id'
+      ),
+      'type' => array(
+        'type' => 'varchar',
+        'length' => 16,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => '事件类型'
+      ),
+      'status' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'size' => 'tiny',
+        'default' => 0,
+        'description' => '事件等级，1、普通，2、严重，3、警告'
+      ),
+      'url' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => '出事地点'
+      ),
+      'value' => array(
+        'type' => 'text',
+        'not null' => TRUE,
+        'description' => '事件描述'
+      ),
+      'timestamp' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => '时间'
+      ),
+      'host' => array(
+        'type' => 'varchar',
+        'length' => 128,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => '目击者 ip'
+      ),
+    ),
+    'indexes' => array(
+      'type' => array('type'),
+      'tex' => array('type', 'ext_id'),
+    ),
+    'primary key' => array('sid'),
+  );
+  $schema['history'] = array(
+    'description' => '浏览记录',
+    'fields' => array(
+      'hid' => array(
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'description' => '主键，自增'
+      ),
+      'uid' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'description' => '用户 uid'
+      ),
+      'session' => array(
+        'type' => 'varchar',
+        'length' => 128,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => 'session id'
+      ),
+      'host' => array(
+        'type' => 'varchar',
+        'length' => 128,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => '主机'
+      ),
+      'path' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => '访问路径，仅统计 hook_menu 定义的路径'
+      ),
+      'referer' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => '来路'
+      ),
+      'timestamp' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => '时间'
+      ),
+    ),
+    'indexes' => array(
+      'uid' => array('uid'),
+    ),
+    'primary key' => array('hid'),
+  );
+  $schema['temp'] = array(
+    'description' => '临时表，自动任务将定期清除该表。',
+    'fields' => array(
+      'tid' => array(
+        'type' => 'varchar',
+        'length' => 128,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'type' => array(
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'data' => array(
+        'type' => 'text',
+        'not null' => FALSE,
+        'size' => 'big',
+      ),
+      'uid' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => '用户 id'
+      ),
+      'timestamp' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'description' => '时间戳'
+      ),
+      'serialized' => array(
+        'type' => 'int',
+        'size' => 'small',
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => '是否序列化'
+      )
+    ),
+    'indexes' => array(
+      'timestamp' => array('timestamp'),
+      'type' => array('type'),
+      'uid' => array('uid'),
+    ),
+    'primary key' => array('tid'),
+  );
+  $schema['languages'] = array(
+    'description' => '多语言',
+    'fields' => array(
+      'language' => array(
+        'type' => 'varchar',
+        'length' => 16,
+        'not null' => TRUE,
+        'default' => '',
+    		'description' => '语言标记',
+      ),
+      'name' => array(
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => TRUE,
+        'default' => '',
+    		'description' => '语言名称',
+      ),
+    ),
+    'uniqid' => array('name' => array('name')),
+    'primary key' => array('language'),
+  );
+  $schema['filter_format'] = array(
+    'description' => '输入法列表',
+    'fields' => array(
+    	'format' => array(
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'name' => array(
+        'type' => 'varchar',
+        'length' => 64,
+        'not null' => TRUE,
+        'description' => '输入法名称'
+      ),
+      'description' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => '描述'
+      ),
+      'roles' => array(
+        'type' => 'text',
+        'not null' => FALSE,
+        'size' => 'big',
+        'description' => '适用角色'
+      ),
+      'cache' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 1,
+        'size' => 'tiny',
+        'description' => '0：不缓存，1：缓存',
+      ),
+    ),
+    'unique keys' => array(
+      'name' => array('name'),
+    ),
+    'primary key' => array('format'),
+  );
+  $schema['filters'] = array(
+    'description' => '输入过滤',
+    'fields' => array(
+      'fid' => array(
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+    	'format' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => '输入法 id'
+      ),
+    	'filter' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => '过滤器 id'
+      ),
+      'delta' => array(
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => '过滤器模块内部编号',
+      ),
+      'module' => array(
+        'type' => 'varchar',
+        'length' => 64,
+        'not null' => TRUE,
+        'default' => '',
+    		'description' => '定义过滤器的模块名称',
+      ),
+      'weight' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => '权重',
+      ),
+    ),
+    'foreign keys' => array(
+    	'format' => array(
+    		'table' => 'filter_format',
+    		'field' => 'format',
+    		'update' => 'cascade',
+    		'delete' => 'cascade'
+    	)
+    ),
+    'uniqid' => array(
+      'fmd' => array('format', 'module', 'delta')
+    ),
+    'primary key' => array('fid'),
+  );
+  $schema['filter_tags'] = array(
+    'description' => '管理员手动添加的过滤器',
+    'fields' => array(
+    	'fid' => array(
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'title' => array(
+        'type' => 'varchar',
+        'length' => 64,
+        'not null' => TRUE,
+        'description' => '格式名称'
+      ),
+      'body' => array(
+        'type' => 'text',
+        'not null' => FALSE,
+        'description' => '内容，由模块控制'
+      ),
+      'delta' => array(
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => '基于的过滤规则在其模块内部编号',
+      ),
+      'module' => array(
+        'type' => 'varchar',
+        'length' => 64,
+        'not null' => TRUE,
+        'default' => '',
+    		'description' => '定义过滤规则的模块名称',
+      ),
+      'description' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => '描述'
+      ),
+    ),
+    'unique keys' => array(
+      'title' => array('title'),
+    ),
+    'indexes' => array(
+      'md' => array('delta', 'module')
+    ),
+    'primary key' => array('fid'),
+  );
+  return $schema;
+}
+
+/**
+ * @Implement of hook_install().
+ *  安装模块
+ */
+function system_install() {
+  $ret = array();
+  $ret = module_install_schema('install', 'system');
+  
+  $languages = array(
+  	'placeholder' => array(':lang', ':name'),
+  	'values' => array(
+	  	array('zh-hans', '简体中文'),
+	  	array('zh-hant', '正體中文')
+  	)
+  );
+  
+  db_exec('INSERT INTO {languages} (language, name) VALUES (:lang, :name)', $languages);
+  
+  _system_install_format();
+  
+  $variables = array(
+  	'placeholder' => array(':name', ':value'),
+  	'values' => array(
+  		array('debug', serialize(1)),
+  		array('sql_info', serialize(1)),
+  		array('default_language', serialize('zh-hans')),
+  		array('languages', serialize(array('zh-hans' => '简体中文', 'zh-hant' => '繁體中文')))
+  	)
+  );
+  db_exec('INSERT INTO {variable} (name, value) VALUES (:name, :value)', $variables);
+  
+  return $ret;
+}
+
+/**
+ * 创建系统主模块(system)配置表，非接口函数，供 install.php 在安装程序时使用
+ */
+function _system_install(){
+	$schema['system'] = array(
+    'description' => '模块、主题注册表',
+		'fields' => array(
+      'filename' => array(
+        'type' => 'varchar',
+        'length' => 64,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => '主键，唯一。模块、主题名称'
+      ),
+      'path'  => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => '物理路径'
+      ),
+      'type'  => array(
+        'type' => 'varchar',
+        'length' => 16,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => '类型，theme 或 module'
+      ),
+      'status'  => array(
+        'type' => 'int',
+        'size' => 'small',
+        'default' => 0,
+        'not null' => TRUE,
+        'description' => '状态。0、未启用。1、已启用。-1、默认主题'
+      ),
+      'install'  => array(
+        'type' => 'int',
+        'default' => 0,
+        'not null' => TRUE,
+        'description' => '模块升级版本号记录'
+      ),
+      'weight'  => array(
+        'type' => 'int',
+        'default' => 0,
+        'not null' => TRUE,
+        'description' => '权重。影响模块加载顺序'
+      ),
+      'info' => array(
+        'type' => 'text',
+        'not null' => TRUE,
+        'description' => '描述'
+      ),
+		),
+		'indexes' => array(
+			'weight'    => array('weight')
+		),
+    'primary key' => array('filename')
+	);
+	
+	return db_create_table('system', $schema['system']);
+}
+
+/**
+ * 写入默认输入法
+ */
+function _system_install_format(){
+
+  // 添加一个纯文本输入法
+  db_exec('INSERT INTO {filter_format} (name, description, cache) VALUES (?, ?, ?)', 
+  array('纯文本', '不允许任何 HTML 标签，仅将换行符置换为 <br />', 1));
+
+  // 将换行符过滤器加入输入法
+  db_exec('INSERT INTO {filters} (format, delta, module, weight) VALUES (?, ?, ?, ?)', array(1, 'br', 'system', 0));
+
+  $settings = array();
+
+  if($fetch = db_query('SELECT f.format, f.name, f.description, t.delta, t.module 
+  FROM {filters} t INNER JOIN {filter_format} f ON t.format = f.format 
+  ORDER BY t.weight ASC, t.fid DESC', NULL, array('fetch' => 'array'))){
+  	foreach($fetch as $o){
+    	$settings[$o->format][] = $o;
+    }
+  }
+  
+  db_exec('INSERT INTO {variable} (name, value) VALUES (:name, :value)', array(
+    'placeholder' => array(':name', ':value'),
+    'values' => array(
+      array('format', serialize($settings)), 
+      array('default_format', serialize(1))
+    )
+  ));
+  
+}
+
+/**
+ * @Implement of hook_enabled().
+ *  模块启用。
+ */
+/*
+function system_enabled(){
+  dd_set_message('欢迎使用 system 模块');
+}
+*/
+
+/**
+ * @Implement of hook_disabled().
+ *  系统将禁用模块，不再载入模块文件，模块实现的接口也将删除。
+ */
+/*
+function system_disabled(){
+  dd_set_message('谢谢使用 system 模块');
+}
+*/
+
+/**
+ * @Implement of hook_uninstall().
+ *   正常情况下，卸载模块应将相关的信息完全删除（包括数据库和文件系统）。
+ */
+/*
+function system_uninstall() {
+  $ret = array();
+  $ret = module_install_schema('uninstall', 'system');
+  return $ret;
+}
+*/

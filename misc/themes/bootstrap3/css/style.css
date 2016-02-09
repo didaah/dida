@@ -1,0 +1,20 @@
+/*$Id$*/
+div.dida-modal-wrapper-hidden {
+  bottom: -99999px;
+  display: block;
+  left: -99999px;
+  position: absolute;
+}
+
+.modal-open {
+  overflow: visible;
+}
+
+.dida-modal-wrapper {
+  overflow: visible;
+}
+
+.item_pager ul.pager {
+  clear: both;
+  overflow: hidden;
+}

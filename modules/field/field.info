@@ -1,0 +1,11 @@
+<?php
+// $Id$
+
+$info = array(
+  'name' => '字段',
+  'description' => '自定义表单字段',
+  'ver' => '1.0',
+  'language' => 'zh-hans',
+  'created' => mktime(12, 2, 0, 2, 10, 2010),
+  'updated' => mktime(12, 2, 0, 2, 10, 2010),
+);

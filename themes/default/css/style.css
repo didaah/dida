@@ -1,0 +1,70 @@
+/* $Id$ */
+#wrapper {
+  width: 960px;
+}
+
+#main {
+  margin: 10px auto;
+  clear: both;
+  padding: 5px;
+  overflow: hidden;
+}
+
+#header {
+	height: 100px;
+  padding: 0px;
+  position:relative;
+  text-align: left;
+  z-index: 10;
+}
+
+/*site menu*/
+#header .menu {
+  bottom: 0;
+  height: 30px;
+  line-height: 30px;
+  position: absolute;
+  right: 0;
+  width: 100%;
+  border-bottom: 1px solid #ccc;
+}
+
+#header .menu .site_menu {
+  height: 30px;
+  float: right;
+}
+
+/* logo */
+#header .logo {
+  display:block;
+  padding-top: 6px;
+  padding-left: 6px;
+  float: left;
+}
+
+/* lang change link */
+.item_dd_item_lang_change {
+  position: absolute;
+  right: 0;
+  top: 10px;
+}
+
+.item_dd_item_lang_change li {
+  float: left;
+  margin: 0 4px;
+}
+
+.dd_lang_link_icon_active {
+  font-weight: bold;
+  color: #BF640A;
+  text-decoration: underline;
+}
+
+
+/*footer*/
+#footer { 
+	clear: both;
+  text-align: center;
+  border-top: 1px solid #ccc;
+  padding: 20px 0;
+}

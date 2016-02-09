@@ -1,0 +1,546 @@
+<?php
+// $Id$
+
+/**
+ * hook_menu
+ */
+function block_menu() {
+  $items = array();
+  $items['admin/blocks/settings'] = array(
+    'access_arguments' => array('admin block'),
+    'page_callback' => 'block_admin_default',
+    'file' => 'block.admin.inc',
+  );
+  $items['admin/blocks/settings/%'] = array(
+    'load_functions' => array(3 => '%'),
+    'access_arguments' => array('admin block'),
+    'page_callback' => 'dd_get_form',
+    'page_arguments' => array('block_admin_form', 3),
+    'file' => 'block.admin.inc',
+  );
+  $items['admin/blocks/settings/%/%'] = array(
+    'title' => '区块设置',
+    'load_functions' => array(3 => '%', 4 => array('block_load')),
+    'access_arguments' => array('admin block'),
+    'page_callback' => 'dd_get_form',
+    'page_arguments' => array('block_settings_form', 3, 4),
+    'file' => 'block.admin.inc',
+  );
+  $items['admin/blocks/cache/%'] = array(
+    'title' => '缓存管理',
+    'load_functions' => array(3 => '%'),
+    'access_arguments' => array('admin block'),
+    'page_callback' => 'dd_get_form',
+    'page_arguments' => array('block_admin_cache', 3),
+    'file' => 'block.admin.inc',
+  );
+  $items['admin/blocks/boxes/add'] = array(
+    'title' => '添加区块',
+    'access_arguments' => array('admin block'),
+    'page_callback' => 'dd_get_form',
+    'page_arguments' => array('block_add_form'),
+    'file' => 'block.form.inc',
+  );
+  $items['admin/blocks/boxes'] = array(
+    'title' => '编辑区块',
+    'access_arguments' => array('admin block'),
+    'page_callback' => 'block_admin_boxes',
+    'file' => 'block.form.inc',
+  );
+  $items['admin/blocks/boxes/edit/%'] = array(
+    'load_functions' => array(4 => array('block_box_load')),
+    'access_arguments' => array('admin block'),
+    'page_callback' => 'dd_get_form',
+    'page_arguments' => array('block_add_form', 4),
+    'file' => 'block.form.inc',
+  );
+  $items['admin/blocks/boxes/delete/%'] = array(
+    'title' => '删除区块',
+    'load_functions' => array(4 => array('block_box_load')),
+    'access_arguments' => array('admin block'),
+    'page_callback' => 'block_admin_delete',
+    'page_arguments' => array(4),
+    'file' => 'block.form.inc',
+  );
+  return $items;
+}
+
+//注册权限
+function block_perm() {
+  return array(
+    'admin block' => '管理区块',
+  );
+}
+
+//管理菜单
+function block_system_admin_menus() {
+  return array(array(
+  	array('管理区块', 'admin/blocks/settings/'.$GLOBALS['conf']['default_theme']),
+    array('添加区块', 'admin/blocks/boxes/add'),
+    array('编辑区块', 'admin/blocks/boxes')
+  ), '区块管理');
+}
+
+/**
+ * 载入区块信息
+ */
+function block_load($bid) {
+	if ($block = db_query('SELECT * FROM {blocks} WHERE bid = ?', array($bid), array('return' => 'one'))) {
+    $block->settings = $block->settings ? unserialize($block->settings) : array();
+    if (!$block->settings['custom']) {
+    	$block->settings['custom'] = array();
+    }
+  	return $block;
+  }
+}
+
+/**
+ * 载入自定义(即管理员后台手动添加)区块信息
+ */
+function block_box_load($bid) {
+  return db_query('SELECT * FROM {boxes} WHERE bid = ?', array($bid), array('return' => 'one'));
+}
+
+/**
+ * 更新区块列表，新增区块时可调用
+ * @param (string) $theme
+ *  主题系统名称，默认更新当前主题的区块列表
+ */
+function block_cache_lists($theme = NULL) {
+  global $conf;
+
+  if (!$theme) {
+  	$theme = $conf['default_theme'];
+  }
+  
+  if ($conf['themes'][$theme]['region']) {
+    $blocks = _block_get_cache_theme($theme);
+    if ($lists = _module_invoke_all('block_list', $theme)) {
+      foreach ($lists as $module => $a) {
+        foreach ($a as $delta => $b) {
+        	if (!$b['title']) {
+        		dd_set_message(t('module', '%string 定义的区块没有提供标题，这是必需项', array('%string' => $module)), 'error');
+        		continue;
+        	}
+          $moduleLists[$module.'_'.$delta] = 1; 
+          if (!$blocks[$module.'_'.$delta]) {
+            $b['theme'] = $theme;
+            $b['module'] = $module;
+            $b['delta'] = $delta;
+            $b['settings'] = array();
+            if (!$b['region']) $b['region'] = '';
+            if (!$b['weight']) $b['weight'] = 0;
+            if (!$b['visibility']) $b['visibility'] = 0;
+            if ($b['custom']) {
+            	$b['settings']['custom'] = $b['custom'];
+            }
+           
+            module_alter_all('block_list_alter', $theme, $module, $delta, $b);
+
+            if ($insert = block_set_info($b)) {
+              $blocks[$module.'_'.$insert->delta] = $insert;
+            }
+          } else {
+          	$blocks[$module.'_'.$delta]->title = $b['title'];
+          }
+        }
+      }
+      
+      if ($delList = array_diff_key($blocks, $moduleLists)) {
+        foreach ($delList as $key => $c) {
+          db_exec('DELETE FROM {blocks} WHERE bid = ?', array($c->bid));
+          unset($blocks[$key]);
+        }
+        var_del('theme_' . $theme . '_view');
+        var_del('theme_' . $theme . '_boxes_view');
+      }
+      if ($insert) cache_del('cid', 'theme_'.$theme.'_list', 'cache_block');
+    }
+    return $blocks;
+  }
+}
+
+/**
+ * @Implement of hook_block_list_alter()
+ * 更新区块列表时，对区块进行重写
+ * @param string $theme
+ *  主题系统名称，区块列表对应的主题
+ * @param string $module
+ *  模块系统名称，区块所属模块
+ * @param strint $delta
+ *  区块在所属模块的内部编号
+ * @param array &$block
+ *  当前区块设置
+ */
+
+/*
+function block_block_list_alter($theme, $module, $delta, &$block) {
+  if ($module == 'user' && $delta == 'login') {
+    $block['visibility'] = '';
+  }
+}
+ */
+
+/**
+ * 获取指定主题的区块列表
+ * @param $theme = sting
+ *  主题系统名称
+ */
+function _block_get_cache_theme($theme) {
+  if ($cache = cache_get('theme_' . $theme . '_list', 'cache_block')) {
+    return $cache->data;
+  } else {
+    if ($fetch = db_query('SELECT bid, module, delta, weight, visibility, region, title FROM {blocks} WHERE theme = ? ORDER BY weight ASC, bid DESC', array($theme))) {
+      foreach ($fetch as $o) {
+        $data[$o->module . '_' . $o->delta] = $o;
+      }
+      cache_set('theme_' . $theme . '_list', $data, 'cache_block');
+    }
+    return $data;
+  }
+}
+
+/**
+ * @Implement of hook_block_list()
+ * @param string $theme
+ *  主题系统名称
+ * @return array
+ */
+function block_block_list($theme) {
+  if ($fetch = db_query('SELECT * FROM {boxes}')) {
+    foreach ($fetch as $o) {
+      $blocks['boxes_'.$o->bid] = array(
+        'title' => $o->title,
+  			//'region' => 'left', // 所在区域，依主题而定
+  			//'weight' => 10, // 排序
+  			//'visibility' => 1, // 显示 或 隐藏，默认隐藏
+  			//'cache' => 0, // 是否缓存，默认缓存
+  			//'custom' => array(''), // 自定义数据。
+      );
+    }
+  }
+  return $blocks;
+}
+
+/**
+ * 输出一个区块显示内容
+ * @Implement of hook_block_view()
+ * @param string $theme
+ *  主题系统名称
+ * @param $config = array()
+ *  配置数据，包含系统配置和自定义配置。
+ *   如：array('system' => array(), 'custom' => array())
+ * @return array
+ */
+function block_block_view($theme, $config) {
+  if (substr($config->delta, 0, 6) == 'boxes_') {
+    list($box, $bid) = explode('_', $config->delta);
+    if ($o = _dd_get_theme_boxes($theme, $bid)) {
+      $block['title'] = t('block', $config->title);
+      if ($o->format) {
+        $block['content'] = filter_view($o->body, $o->format, 'block', $o->bid);
+      } else {
+        $block['content'] = $o->body;
+      }
+      return $block;
+    }
+  }
+}
+
+/**
+ *  写入区块
+ */
+function block_set_info($block = array()) {
+  $args = array(
+    'cache' => 1,
+    'settings' => array()
+  );
+  $block = array_merge($args, $block);
+  
+  if (db_exec('INSERT INTO {blocks} (module, theme, region, delta, title, weight, visibility, cache, settings) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', array($block['module'], $block['theme'], $block['region'], $block['delta'], $block['title'], $block['weight'], $block['visibility'], $block['cache'], serialize($block['settings'])))) {
+    if ($block['bid'] = db_last_insert_id()) {
+      return (object) $block;
+    }
+  }
+}
+
+// 更新区块
+function block_update_info($bid, $block = array()) {
+  $args = array(
+    'cache' => 1,
+    'settings' => array()
+  );
+  $block = array_merge($args, $block);
+  
+  db_exec('UPDATE {blocks} SET weight = ?, region = ?, title = ?, visibility = ?, cache = ?, settings = ? WHERE bid = ?', array($block['weight'], $block['region'], $block['title'], $block['visibility'], $block['cache'], serialize($block['settings']), $bid));
+  
+  return true;
+}
+
+// public block_get_cache_theme($theme, $region = NULL) {{{ 
+/**
+ * block_get_cache_theme
+ * 按主题、区域读取已缓存的已启用区块信息 
+ * @param string $theme 
+ *  主题系统名称
+ * @param string $region 
+ *  区域系统名称
+ * @access public
+ * @return array
+ */
+function block_get_cache_theme($theme, $region = NULL) {
+  if ($cache = var_get('theme_' . $theme . '_view')) {
+    return !$region ? $cache : $cache[$region];
+  } else if ($fetch = db_query('SELECT * FROM {blocks} WHERE theme = ? AND visibility = 1 AND region != ? 
+  ORDER BY weight ASC, bid DESC', array($theme, '0'))) {
+    foreach ($fetch as $o) {
+      $o->settings = $o->settings ? unserialize($o->settings) : array();
+      if (!$o->settings['custom']) {
+        $o->settings['custom'] = array();
+      }
+      $data[$o->region][$o->module][$o->delta] = $o;
+    }
+    var_set('theme_' . $theme . '_view', $data);
+    
+    return !$region ? $data : $data[$region];
+  }
+}
+// }}}
+
+// public block_get_cache_theme_boxes($theme) {{{ 
+/**
+ * block_get_cache_theme_boxes
+ * 按主题读取该主题下所有管理员自定义区块 id，即保存在 boxes 表中的区块
+ * @param string $theme 
+ * @access public
+ * @return string
+ */
+function block_get_cache_theme_boxes($theme) {
+
+  if (!$data = var_get('theme_' . $theme . '_boxes_view')) {
+    if ($blocks = block_get_cache_theme($theme)) {
+      $id = array();
+      foreach ($blocks as $o) {
+        foreach ($o as $module => $blocks) {
+          foreach ($blocks as $delta => $block) {
+            if (substr($delta, 0, 6) == 'boxes_') {
+              $id[] = end(explode('_', $delta, 2));
+            }
+          }
+        }
+      }
+      if (!empty($id)) {
+        $data = implode(',', $id);
+      } else {
+        $data = -1;
+      }
+      var_set('theme_' . $theme . '_boxes_view', $data);
+    }
+  }
+
+  return $data;
+}
+// }}}
+
+// protected _dd_get_theme_boxes($blocks) {{{ 
+/**
+ * _dd_get_theme_boxes
+ * 获取指定主题中的自定义的区块，即保存在 boxes 表中的区块
+ * @param string $theme
+ *  主题系统名称
+ * @param int $bid
+ *  区块在 boxes 表中的 id
+ * @access protected
+ * @return object|bool
+ */
+function _dd_get_theme_boxes($theme, $bid) {
+  static $data;
+
+  if (!isset($data)) {
+    $data = array();
+    if ($id = block_get_cache_theme_boxes($theme)) {
+      if ($id != -1) {
+        if ($fetch = db_query('SELECT * FROM {boxes} WHERE bid IN (' . $id . ')')) {
+          foreach ($fetch as $o) {
+            $data[$o->bid] = $o;
+          }
+        }
+      }
+    }
+  }
+
+  return !empty($data) ? $data[$bid] : false;
+}
+// }}}
+
+/**
+ * 获取显示区块
+ * @param (string) $theme
+ *  主题系统名称，默认为当前主题
+ * @param (string) $region
+ *  区域，默认为指定主题定义的全部区块
+ * @return 返回一个以 region 为键名的数组
+ */
+function dd_get_block($theme = NULL, $region = NULL) {
+  if (!$theme) {
+    $theme = $GLOBALS['conf']['default_theme'];
+  }
+  
+  if ($blocks = block_get_cache_theme($theme, $region)) {
+    foreach ($blocks as $reg => $v) {
+      foreach ($v as $module => $c) {
+        
+        if (!function_exists($module.'_block_view')) {
+          continue;
+        }
+        
+        foreach ($c as $block) {
+          if ($block->settings['display']['type'] && $block->settings['display']['body']) {
+          	if (block_path_display($block->settings['display']['type'], $block->settings['display']['body']) == false) {
+          		continue;
+          	}
+          }
+          
+          $b = call_user_func($module.'_block_view', $block->theme, $block);
+          
+          $block_value = $block_title = NULL;
+          
+          if (is_array($b)) {
+            if ($b['content']) {
+              $block_value = $b['content'];
+            }
+            if (!empty($b['title'])) {
+              $block->title = $b['title'];
+            }
+          } else {
+            $block_value = $b;
+          }
+          
+          if (!$block_value) {
+          	continue;
+          }
+          
+          $block->region = $reg;
+          $block->module = $module;
+          $block->content = $block_value;
+          
+          $output[$reg] .= theme('block', $block)."\n";    
+        }
+      }
+    }
+  }
+  
+  if ($blocks = dd_set_block()) {
+    foreach ($blocks as $region => $lists) {
+      foreach ($lists as $block) {
+        if (isset($block->module) && isset($block->delta)) {
+          $block->region = $region;
+          $output[$block->region] .= theme('block', $block)."\n";   
+        } 
+      }
+    }
+  }
+  
+  return $output;
+}
+
+/**
+ * 在代码中写入区块，由代码控制，不显示在区块管理中
+ * @param object $value
+ *  区块数据，(object) array(
+ *    'module' => (string),
+ *    'delta' => (string),
+ *    'region' => (string),
+ *    'content' => (string),
+ *    'title' => (string), 
+ *  )
+ * @param string $region
+ *  显示区域
+ * @return array
+ */
+function dd_set_block($value = NULL, $region = 'left') {
+  static $block;
+  if ($value) {
+    $block[$region][] = $value;
+  } else {
+    return $block;
+  }
+}
+
+/**
+ * @Implement of hook_theme()
+ */
+function block_theme() {
+  return array(
+    'block' => array(
+      'tpl' => 'block.tpl.php',
+      'args' => array('block'),
+    )
+  );
+}
+
+/**
+ * @Implement of hook_template_preprocess_x()
+ * 
+ * 区域模板文件加载顺序：
+ * block_{$block->module}_{$block->delta}.tpl.php
+ * block_{$block->module}.tpl.php
+ * block.tpl.php
+ * 
+ */
+function block_template_preprocess_block(&$var, $hook) {
+  $var['theme_config']->tpl[] = 'block_' . $var['block']->module . '.tpl.php';
+  $var['theme_config']->tpl[] = 'block_' . $var['block']->module . '_' . $var['block']->delta . '.tpl.php';
+}
+
+function block_path_display($type, $text) {
+	$return = false;
+	switch ($type) {
+		case 1:
+			if (substr($text, 0, 1) != '/') {
+				if (strpos($text, "\n") !== false) {
+					foreach (explode("\n", $text) as $path) {
+						$path = trim($path);
+						if ($path) $lists[] = $path;
+					}
+				} else {
+					$lists[0] = $text;
+				}
+				
+				if ($lists) {
+					return _menu_check_path_filter($_GET['q'], $lists);
+				}
+				
+			} else if (preg_match($text, $_GET['q'])) {
+				// 正则模式
+				$return = true;
+			}
+		break;
+		case 2:
+			if (substr($text, 0, 1) != '/') {
+				if (strpos($text, "\n") !== false) {
+					foreach (explode("\n", $text) as $path) {
+						$path = trim($path);
+						if ($path) $lists[] = $path;
+					}
+				} else {
+					$lists[0] = $text;
+				}
+				
+				if ($lists) {
+					return !_menu_check_path_filter($_GET['q'], $lists);
+				}
+			} else if (!preg_match($text, $_GET['q'])) {
+				// 正则模式
+				$return = true;
+			}
+		break;
+		case 3:
+      /**
+       * PHP 模式
+       * 若全局禁用了 php 输入格式，则返回 false
+       */
+      return $GLOBALS['_filter_is_php_code'] == true ? eval($text) : false;
+	}
+	return $return;
+}

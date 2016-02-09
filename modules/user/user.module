@@ -1,0 +1,2246 @@
+<?php
+// $Id$
+
+/**
+ * 权限注册：hook_perm();
+ * 生成注册表单之前：hook_user_before_register_form($op)
+ * 用户注册表单：hook_user_register_form(&$form)
+ * 用户注册验证：hook_user_register_validate($form, $v)
+ * 用户写入成功：hook_user_insert(&$ac)
+ * 用户登录表单：hook_user_login_form(&$form)
+ * 用户登录验证：hook_user_login_validate(&$ac, $v)
+ * 载入用户信息：hook_user_load(&$ac)
+ * 用户信息编辑表单：hook_user_edit_form($ac, $op, &$form)
+ * 用户信息编辑验证：hook_user_validate($v, $ac)
+ * 用户信息更新保存：hook_user_save($ac)
+ * 用户删除：hook_user_delete($ac)
+ * 用户状态改变：hook_user_status($oldStatus, $ac)
+ *   status：0、未激活，1、正常，2、冻结，3、注销
+ * 用户注销：hook_user_logout($ac)
+ */
+
+// 用户状态
+define('USER_STATUS_PEND', 0); // 未激活
+define('USER_STATUS_ACTIVE', 1); // 正常状态
+define('USER_STATUS_HIDE', 2); // 隐藏状态，不允许登录
+define('USER_STATUS_DELETE', -1); // 已删除 
+
+/**
+ * @Implement of hook_menu()
+ */
+function user_menu() {
+  $items = array();
+
+  $items['user'] = array(
+    'access_callback' => true,
+    'page_callback' => 'user_default',
+    'file' => 'user.page.inc',
+  );
+
+	$items['user/center'] = array(
+		'title' => '个人中心',
+		'access_callback' => 'user_is_login',
+		'page_callback' => 'user_page_center',
+		'file' => 'user.page.inc',
+	);
+
+	$items['user/center/%'] = array(
+		'description' => '个人中心扩展页',
+		'access_callback' => 'user_is_login',
+    'page_callback' => 'user_page_center',
+    'load_functions' => array(2 => '%'),
+    'page_arguments' => array(2),
+		'file' => 'user.page.inc',
+	);
+
+  $items['user/login'] = array(
+    'title' => '登录',
+    'access_callback' => 'user_is_not_login',
+    'access_arguments' => array('goto'),
+    'page_callback' => 'user_page_login',
+    'file' => 'user.page.inc',
+  );
+
+  $items['user/login/ajax'] = array(
+    'access_callback' => 'user_is_not_login',
+    'page_callback' => 'user_page_login_ajax',
+    'file' => 'user.page.inc',
+  );
+
+  $items['user/register'] = array(
+    'title' => '注册',
+    'access_callback' => 'user_is_register',
+    'access_arguments' => array('goto'),
+    'page_callback' => 'user_page_register',
+    'file' => 'user.page.inc',
+  );
+
+  $items['user/activation'] = array(
+    'title' => '激活',
+    'access_callback' => 'user_is_activation',
+    'access_arguments' => array('goto'),
+    'page_callback' => 'dd_get_form',
+    'page_arguments' => array('user_page_activation'),
+    'file' => 'user.page.inc',
+  );
+
+  $items['user/pass'] = array(
+    'title' => '找回密码',
+    'access_callback' => 'user_is_not_login',
+    'access_arguments' => array('goto'),
+    'page_callback' => 'dd_get_form',
+    'page_arguments' => array('user_page_pass'),
+    'file' => 'user.page.inc',
+  );
+
+  $items['user/logout'] = array(
+    'access_callback' => 'user_is_login',
+    'page_callback' => 'user_logout',
+  );
+  
+  $items['user/%'] = array(
+    'load_functions' => array(1 => array('user_load')),
+    'access_callback' => 'user_is_user_view',
+    'access_arguments' => array(1),
+    'page_callback' => 'user_view',
+    'page_arguments' => array(1),
+  );
+
+  /**
+   * 模块可通过 hook_user_page_info() 定义页面
+   * function test_user_page_info() {
+   *  return array(
+   *    'images' => array( // 则该页面的访问路径为 user/$uid/page/images
+   *      'title' => t('user', '我的图片'),
+   *    ),
+   *    'file' => array( // 则该页面的访问路径为 user/$uid/page/file
+   *      'title' => t('user', '我的文件')
+   *    ),
+   *  );
+   * }
+   *
+   * 可通过 hook_user_page_view() 输出内容
+   * function test_user_page_view(&$ac, $type) {
+   *  if ($type == 'images') {
+   *    $ac->content = $ac->name . '的图片';
+   *  } else if ($type == 'file') {
+   *    $ac->content = $ac->name . '的文件';
+   *  }
+   * }
+   * 
+   */ 
+  $items['user/%/page'] = array(
+    'description' => '用户个人页面扩展',
+    'load_functions' => array(1 => array('user_load')),
+    'access_callback' => 'user_is_user_view',
+    'access_arguments' => array(1),
+    'file' => 'user.page.inc',
+    'page_callback' => 'user_page_view',
+    'page_arguments' => array(1),
+  );
+  
+  $items['admin/users'] = array(
+    'title' => '用户列表',
+    'access_arguments' => array('admin user view'),
+    'page_callback' => 'user_admin_default',
+    'file' => 'user.admin.inc',
+  );
+
+  $items['admin/users/view/%'] = array(
+    'title' => '用户资料',
+    'load_functions' => array(3 => array('user_load')),
+    'access_arguments' => array('admin user view'),
+    'page_callback' => 'user_admin_view',
+    'page_arguments' => array(3),
+    'file' => 'user.admin.inc',
+  );
+
+  $items['admin/users/add'] = array(
+    'title' => '新增用户',
+    'access_arguments' => array('admin user add'),
+    'page_callback' => 'dd_get_form',
+    'page_arguments' => array('user_admin_add'),
+    'file' => 'user.admin.inc',
+  );
+
+  $items['admin/users/perms'] = array(
+    'title' => '用户权限',
+    'access_arguments' => array('admin user perms'),
+    'page_callback' => 'dd_get_form',
+    'page_arguments' => array('user_set_perm'),
+    'file' => 'user.admin.inc',
+  );
+
+  $items['admin/users/roles'] = array(
+    'title' => '角色管理',
+    'access_arguments' => array('admin user roles'),
+    'page_callback' => 'user_admin_roles',
+    'file' => 'user.admin.inc',
+  );
+
+  $items['admin/users/fields'] = array(
+    'title' => '用户字段',
+    'access_arguments' => array('admin user fields'),
+    'page_callback' => 'user_admin_fields',
+    'file' => 'user.admin.inc',
+  );
+
+  $items['admin/users/settings'] = array(
+    'title' => '用户设置',
+    'access_arguments' => array('admin user settings'),
+    'page_callback' => 'dd_get_form',
+    'page_arguments' => array('user_set_settings'),
+    'file' => 'user.admin.inc',
+  );
+
+  return $items;
+}
+
+/**
+ * 允许注册
+ */
+function user_is_register() {
+  return ($GLOBALS['conf']['user']['register'] && !$GLOBALS['user']->uid);
+}
+
+/**
+ * 超级管理员
+ */
+function user_is_root_user() {
+  return !empty($GLOBALS['user']->uid) && $GLOBALS['user']->uid == 1;
+}
+
+/**
+ * 已登录
+ */
+function user_is_login() {
+  return !empty($GLOBALS['user']->uid);
+}
+
+/**
+ * 浏览权限判断
+ */
+function user_is_user_view($ac) {
+  return user_access('user view user info') || $ac->uid == $GLOBALS['user']->uid;
+}
+/**
+ * 激活
+ */
+function user_is_activation($goto = NULL) {
+ if (!$GLOBALS['user']->uid) {
+   if ($GLOBALS['conf']['user']['status'] == 0) {
+    return true;
+   } else if ($goto) {
+     dd_set_message(t('user', '当前设置无法自动激活帐号，请联系管理员，手动激活'));
+     dd_goto(NULL);
+   }
+ } else if ($goto) {
+   dd_set_message(t('user', '当前帐号已激活，若要激活其它帐号，请先退出'));
+   dd_goto(NULL);
+ }
+}
+
+/**
+ * 未登录
+ */
+function user_is_not_login($goto = NULL) {
+  if (!$GLOBALS['user']->uid) {
+    return true;
+  } else if ($goto) {
+    dd_goto('user/'.$GLOBALS['user']->uid);
+  }
+}
+
+/**
+ * 判断编辑权限
+ * @param (object) $ac
+ */
+function user_is_edit($ac = NULL) {
+  if (!isset($ac->uid)) {
+    $ac = $GLOBALS['user'];
+  }
+  
+  if ($ac->uid > 0) {
+    return ($ac->uid == $GLOBALS['user']->uid && user_access('user change own', $ac)) 
+    || user_access('admin user edit all', $ac);
+  }
+}
+
+/**
+ * 权限验证
+ */
+function user_access($string, $account = NULL, $reset = false) {
+  if (!$account) $account = $GLOBALS['user'];
+  
+  if ($account->uid == 1) return true;
+  
+  static $perm = array(), $perms;
+  
+  if ($reset) {
+    var_del('roles_perm_cache');
+    $perm[$account->uid] = array();
+  }
+  
+  if (!isset($perms)) {
+    $perms = user_get_perms();
+  }
+  
+  if (!isset($perm[$account->uid])) {
+    $perm[$account->uid] = array();
+    
+    if ($account->roles) {
+      foreach ($account->roles as $rid => $m) {
+        if ($perms[$rid]) {
+          $perm[$account->uid] += $perms[$rid];
+        }
+      }
+    }
+    
+  }
+  
+  return isset($perm[$account->uid][$string]);
+}
+
+/**
+ * @Implement of hook_system_tools_ajax()
+ * 搜索用户，返回json数据
+ */
+function user_system_tools_ajax($v, $g) {
+  $data['error'] = 1;
+  
+  if ($g['op'] == 'auto' && $v['value']) {
+    if ($fetch = db_query('SELECT name FROM {users} WHERE name LIKE ?',
+    array('%'.$v['value'].'%'), array('limit' => 10))) {
+      $data['error'] = 0;
+      foreach ($fetch as $o) {
+        $data['contents'][] = $o->name;
+      }
+    }
+  }
+  
+  return json_encode($data);
+}
+
+/**
+ * 角色权限缓存
+ */
+function user_get_perms($rid = NULL) {
+  static $perms;
+  if (!isset($perms)) {
+    $perms = var_get('roles_perm_cache', false);
+    if ($perms === false) {
+      if ($fetch = db_query('SELECT rid, perm FROM {role}')) {
+        $perms = array();
+        foreach ($fetch as $row) {
+          if ($row->perm) {
+            $perms[$row->rid] = array_flip(dd_array2_to('key', unserialize($row->perm)));
+          }
+        }
+        var_set('roles_perm_cache', $perms);
+      }
+    }
+  }
+  
+  if (!$rid) {
+    return $perms;
+  } else if (is_string($rid)) {
+    return $perms[$rid];
+  } else if (is_array($rid)) {
+    $k = array();
+    foreach ($rid as $i) {
+      if ($perms[$i])
+        $k += $perms[$i];
+    }
+    return $k;
+  }
+}
+
+/**
+ * hook_perm
+ */
+function user_perm() {
+  return array(
+    'user view user info' => t('user', '浏览会员'),
+    'user use search user' => t('user', '搜索会员'),
+    'admin user view' => t('user', '管理用户'),
+    'admin user add' => t('user', '新增用户'),
+    'admin user perms' => t('user', '用户权限'),
+    'admin user roles' => t('user', '用户角色'),
+    'admin user fields' => t('user', '用户字段'),
+    'admin user settings' => t('user', '用户设置'),
+    'admin user edit all' => t('user', '编辑所有用户资料'),
+    'admin user change mail' => t('user', '编辑用户邮箱'),
+    'admin user change name' => t('user', '编辑用户昵称'),
+    'user change own' => t('user', '编辑自己的资料'),
+    'user change mail' => t('user', '编辑自己的邮箱'),
+    'user change name' => t('user', '编辑自己的昵称'),
+  );
+}
+
+/**
+ * 管理菜单
+ */
+function user_system_admin_menus() {
+  $item = array(
+    array(t('user', '用户设置'), 'admin/users/settings'),
+    array(t('user', '用户列表'), 'admin/users'),
+    array(t('user', '用户权限'), 'admin/users/perms'),
+    array(t('user', '角色管理'), 'admin/users/roles'),
+    array(t('user', '用户字段'), 'admin/users/fields'),
+    array(t('user', '新增用户'), 'admin/users/add'),
+  );
+  
+  return array($item, t('user', '用户管理'));
+}
+
+function _user_perm() {
+  static $perms = NULL;
+  if (!isset($perms)) {
+    if ($data = cache_get('user_perm')) {
+      $perms = $data->data;
+    } else {
+      $perms = _module_invoke_all('perm');
+      cache_set('user_perm', $perms);
+    }
+  }
+  return $perms;
+}
+
+function _user_role_perms($perms) {
+  if ($perms) {
+    $data = _user_perm();
+    foreach ($perms as $module => $perm) {
+      $item = array();
+      foreach ($perm as $key => $v) {
+        $item[] = $data[$module][$key];
+      }
+      $items[] = theme('item_list', array(implode('，', $item)), $module);
+    }
+    return theme('item_list', $items);
+  }
+}
+
+function _user_perm_array($array) {
+  foreach ($array as $value) {
+    foreach ($value as $key => $val) {
+      $t[$key] = $val;
+    }
+  }
+  return $t;
+}
+
+/**
+ * users表的data字段，用做存储自定义数据
+ * 数值以键值形式序列化保存，相同键值将覆盖
+ * @param (int)$uid
+ *  用户 id
+ * @param (array)$value
+ *  需保存的数据
+ */
+function user_set_data($uid, $value = array()) {
+  if ($o = db_query('SELECT uid, data FROM {users} WHERE uid = ?', array($uid), array('return' => 'one'))) {
+    $data = array();
+    if ($o->data) $data = unserialize($o->data);
+    $data = array_merge($data, $value);
+    db_exec('UPDATE {users} SET data = ? WHERE uid = ?', array(serialize($data), $o->uid));
+    global $user;
+    if ($o->uid == $user->uid) {
+      $user->data = $data;
+    }
+  }
+}
+
+/**
+ * 获取自定义数据
+ * @param (int)$uid
+ *  用户id
+ * @param (*)$key
+ *  合法的键名，留空则获取全部
+ */
+function user_get_data($uid, $key = NULL) {
+  global $user;
+  if ($uid == $user->uid) {
+    return $key ? $user->data[$key] : $user->data;
+  } else if ($data = db_query('SELECT data FROM {users} WHERE uid = ?', array($uid), array('return' => 'column'))) {
+    $data = unserialize($data);
+    return $key ? $user->data[$key] : $user->data;
+  }
+}
+
+/**
+ * 判断当前用户是否为指定用户
+ */
+function user_get_current_name($ac) {
+  if ($GLOBALS['user']->uid == $ac->uid) {
+    return t('user', '我');
+  } else {
+    return $ac->name;
+  }
+}
+/**
+ * 用户编辑表单
+ */
+function user_edit_form($ac, $op = 'user') {
+  global $conf, $user;
+  
+  if (!$ac->data) $ac->data = array();
+  if (user_access('admin user change name') || ($user->uid == $ac->uid && user_access('user change name'))) {
+    $form['fields']['name'] = array(
+      '#type' => 'textfield',
+      '#default_value' => $ac->name,
+      '#required' => 1,
+      '#weight' => -100,
+      '#title' => t('user', '昵称'),
+    );
+  } else {
+    $form['fields']['name'] = array(
+      '#value' => $ac->name, 
+      '#weight' => -100,
+      '#title' => t('user', '昵称')
+    );
+  }
+  
+  if (user_access('admin user change mail') || ($user->uid == $ac->uid && user_access('user change mail'))) {
+    $form['fields']['mail'] = array(
+      '#type' => 'textfield',
+      '#default_value' => $ac->mail,
+      '#required' => 1,
+      '#weight' => -90,
+      '#title' => t('user', '帐号'),
+    );
+  } else {
+    $form['fields']['mail'] = array(
+      '#value' => $ac->mail,
+      '#weight' => -90,
+      '#title' => t('user', '帐号')
+    );
+  }
+  
+  $form['fields']['created'] = array(
+    '#weight' => -80,
+    '#value' => format_date($ac->created),
+    '#title' => t('user', '注册时间')
+  );
+  $form['fields']['host'] = array(
+    '#value' => dd_get_ip($ac->host, 1),
+    '#weight' => -80,
+    '#title' => t('user', '上次登录主机')
+  );
+  $form['fields']['login'] = array(
+    '#value' => $ac->login ? format_date($ac->login) : '首次登录',
+    '#weight' => -80,
+    '#title' => t('user', '上次登录时间')
+  );
+  
+  if ($op == 'user' && var_get_key('user', 'is_pass', 1)) {
+    $form['fields']['pass'] = array(
+      '#type' => 'password',
+      '#title' => t('user', '密码'),
+      '#required' => 1,
+      '#weight' => -70,
+      '#description' => t('user', '必须验证密码才能修改资料，!link', array('!link' => l(t('user', '修改密码'), 'user/center/newpass')))
+    );
+  }
+  
+  if (($conf['user']['select_lang'] || $op == 'admin') && count($conf['languages']) > 1) {
+	  $form['fields']['language'] = array(
+	    '#type' => 'select',
+	    '#title' => t('user', '语言'),
+	    '#default_value' => $ac->language,
+	    '#weight' => -60,
+	    '#options' => array('' => t('user', '默认')) + $conf['languages'],
+	  );
+	}
+
+	if (($conf['user']['select_theme'] || $op == 'admin') && count($conf['themes']) > 1) {
+		
+	  foreach ($conf['themes'] as $theme) {
+	  	$themes[$theme['filename']] = $theme['name'];
+	  }
+	  
+	  $form['fields']['theme'] = array(
+	    '#type' => 'select',
+	    '#title' => t('user', '主题'),
+	    '#weight' => -60,
+	    '#default_value' => $ac->theme,
+	    '#options' => array('' => t('user', '默认')) + $themes,
+	  );
+  }
+  
+  if ($op == 'admin') {
+	  $opt = user_roles_opt();
+	  unset($opt[var_get_key('user', 'anonymous_role', 1)]);
+	  $form['fields']['rid'] = array(
+	    '#type' => 'checkbox',
+	    '#title' => t('user', '角色'),
+	    '#weight' => -60,
+	    '#default_value' => $ac->roles ? array_flip($ac->roles) : NULL,
+	    '#options' => $opt,
+	  );
+  }
+  
+  $form['fields']['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('user', '确认提交'),
+    '#weight' => 100,
+    '#submit' => 'user_edit_submit'
+  );
+  
+  field_get_node_form('user', 'field', $ac, $form, NULL, $ac);
+  module_alter_all('user_edit_form', $ac, $op, $form);
+  
+  $form['settings'] = array(
+    '#validate' => array('user_edit_validate'),
+    '#values_object' => true,
+    '#ajax_validate' => true
+  );
+  $form['fields']['op'] = array(
+    '#default_value' => $op,
+    '#type' => 'hidden',
+    '#constant' => 1
+  );
+  $form['fields']['uid'] = array(
+    '#default_value' => $ac->uid,
+    '#type' => 'hidden',
+    '#constant' => 1
+  );
+  $form['fields']['nid'] = array(
+    '#default_value' => $ac->uid,
+    '#type' => 'hidden',
+    '#constant' => 1
+  );
+  
+  return $form;
+}
+
+/**
+ * 用户资料编辑验证
+ */
+function user_edit_validate($form, &$value) {
+  global $user;
+  if ($value['uid'] == $user->uid) {
+    $ac = $user;
+  } else {
+    $ac = user_load($value['uid']);
+  }
+  
+  if (user_access('admin user change mail') || ($user->uid == $ac->uid && user_access('user change mail'))) {
+    if ($ac->mail != $value['mail']) {
+      $error = user_default_validate_mail($value['mail']);
+    }
+  }
+  
+  if (!$error && (user_access('admin user change name') || ($user->uid == $ac->uid && user_access('user change name')))) {
+    if ($ac->name != $value['name']) {
+      $error = user_default_validate_name($value['name']);
+    }
+  }
+  
+  // 验证密码
+  if (!$error && $value['op'] == 'user' && var_get_key('user', 'is_pass', 1) && !user_is_login_pass(array('uid' => $ac->uid), $value['pass'])) {
+    $error['pass']['#error'][] = t('user', '密码不匹配');
+  }
+  
+  if (!$error) {
+    if (!$error = field_get_node_validate('user', 'field', $value['_dida_values'], $ac, $form)) {
+      /**
+       * 触发 hook_user_validate()
+       */
+      $error = module_invoke_all('user_validate', $value['_dida_values'], $ac, $form);
+    }
+  }
+  
+  return $error;
+}
+
+function user_edit_submit($form, &$value) {
+  global $user;
+  if ($value['uid'] == $user->uid) {
+    $ac = $user;
+  } else {
+    $ac = user_load($value['uid']);
+  }
+  
+  if ($value['_dida_values']->theme) {
+    $ac->theme = $value['_dida_values']->theme;
+  }
+  if ($value['_dida_values']->language) {
+    $ac->language = $value['_dida_values']->language;
+  } else if (!$ac->language) {
+    $ac->language = '';
+  }
+  
+  
+  if (user_access('admin user change mail') || ($user->uid == $ac->uid && user_access('user change mail'))) {
+    $ac->mail = $value['_dida_values']->mail;
+  }
+  if (user_access('admin user change name') || ($user->uid == $ac->uid && user_access('user change name'))) {
+    $ac->name = $value['_dida_values']->name;
+  }
+  
+  if (isset($value['_dida_values']->pass) && $salt = user_get_salt_pass($value['_dida_values']->pass)) {
+    // 修改密码，并重新生成随机串
+    $value['_dida_values']->pass = $salt['pass'];
+    $value['_dida_values']->salt = $salt['salt'];
+  } else {
+    unset($value['_dida_values']->pass);
+  }
+  
+  if (db_write_record('users', $value['_dida_values'], array('uid'))) {
+    /**
+     * 触发 hook_user_save()
+     */
+    
+    if ($value['_dida_values']->rid) {
+    	user_set_roles($ac->uid, $value['_dida_values']->rid);
+    }
+    
+    if ($_FILES['fields']) {
+      file_delete_dir(file_directory_path().'/avatar/thumb_'.$ac->uid);
+    }
+    
+    module_invoke_all('user_save', $value['_dida_values'], $ac);
+    
+    field_get_node_save('user', 'field', $value['_dida_values'], $ac);
+    
+    if ($user->uid == $ac->uid) {
+      user_clear_session($ac->uid);
+    }
+    
+    dd_set_message(t('user', '编辑成功'));
+  }
+}
+
+/**
+ * 保存用户
+ * @param (object) $v
+ *  用户数据
+ * @param (object) $ac
+ *  用户旧数据，如果是增加用户，用户旧数据，可能为空
+ */
+function user_save($v, $ac = NULL, &$error = NULL) {
+  if (!$ac->uid && $v->uid) {
+    $ac = user_load($v->uid);
+  }
+
+  if (!$error = user_validate($v, $ac)) {
+    if ($ac->uid) {
+
+      // 编辑
+      if (isset($v->theme)) $ac->theme = $v->theme;
+      if (isset($v->language)) $ac->language = $v->language;
+      if (isset($v->mail)) $ac->mail = $v->mail;
+      
+      if (db_exec('UPDATE {users} SET name = ?, mail = ?, theme = ?, language = ? WHERE uid = ?',
+      array($ac->name, $ac->mail, $ac->theme, $ac->language, $ac->uid), array('return' => 1))) {
+        $v->nid = $ac->uid;
+
+        // 写入用户角色
+        if (!empty($v->rid)) {
+        	user_set_roles($ac->uid, $v->rid);
+        }
+        
+        field_get_node_save('user', 'field', $v, $ac);
+        module_invoke_all('user_save', $v, $ac);
+        
+        if ($user->uid == $ac->uid) {
+          user_clear_session($ac->uid);
+        }
+
+        // 用户第三方信息
+        if (!empty($v->ext)) {
+          user_ext_save($ac, $v->ext);
+        }
+      }
+
+      return $v;
+    } else if ($ac = user_insert($v)) {
+      // 用户第三方信息
+      if (!empty($v->ext)) {
+        user_ext_save($ac, $v->ext);
+      }
+      return $ac;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * 用户第三方信息保存
+ * 一个系统用户可对应多个第三方用户，第三方用户名可重复
+ * 如第三方用户名需唯一，模块本接口或 user_save() 时，应先行检查
+ * @param object $ac 
+ *  用户数据，必须包含 uid
+ * @param array $ext 
+ *  待写入的第三方记录，可同时写入多条
+ *  必须包含 type 和 ext_name，若有 aid，则为更新，示例：
+ *   array(
+ *    array( // 可为 array 或 object
+ *      'ext_name' => 'testname',
+ *      'type' => 'openid',
+ *    ),
+ *   )
+ * @access public
+ * @return bool 以写入状态为准，若有一条记录写入失败，则返回 false
+ */
+function user_ext_save($ac, $ext) {
+  if (empty($ac->uid) || !is_array($ext)) return false;
+  
+  $return = false;
+
+  foreach ($ext as $rows) {
+    if (is_object($rows)) {
+      $rows = (array) $rows;
+    } else if (!is_array($rows)) {
+      continue;
+    }
+    
+    if (empty($rows['ext_name']) || empty($rows['type'])) continue;
+    
+    $rows['uid'] = $ac->uid;
+
+    if (!empty($rows['aid'])) {
+      $return = db_write_record('user_ext', $rows, array('aid'));
+    } else {
+      $return = db_write_record('user_ext', $rows);
+    }
+  }
+
+  return $return;
+}
+
+/**
+ * 加载与用户相关的所有第三方信息 
+ * @param int $uid 
+ *  用户 uid
+ * @access public
+ * @return array
+ */
+function user_ext_load($uid) {
+  if ($fetch = db_query('SELECT * FROM {user_ext} WHERE uid = ?', array($uid))) {
+    $ext = new stdClass;
+    foreach ($fetch as $o) {
+      $o->data = !empty($o->data) ? unserialize($o->data) : array();
+      $ext->{$o->type}[$o->aid] = $o;
+    }
+    return $ext;
+  }
+}
+
+/**
+ * 加载一条第三方信息记录
+ * @param int $aid 
+ * @access public
+ * @return object
+ */
+function user_ext_rows_load($aid) {
+  static $data;
+
+  if (!isset($data[$aid])) {
+    $data[$aid] = array();
+    if ($data[$aid] = db_query('SELECT * FROM {user_ext} WHERE aid = ?', array($aid), array('return' => 'one'))) {
+      $data[$aid]->data = !empty($data[$aid]->data) ? unserialize($data[$aid]->data) : array();
+    }
+  }
+
+  return $data[$aid];
+}
+
+
+/**
+ * 验证用户
+ * @param (object) $v
+ *  用户数据
+ * @param (object) $ac
+ *  如果是编辑用户，用户旧数据，可能为空
+ */
+function user_validate($v, $ac = NULL) {
+  global $user;
+  $error = NULL;
+  
+  if (!$ac->uid && $v->uid) {
+    $ac = user_load($v->uid);
+  }
+  if (!$v->mail) {
+    $error['mail']['#error'][] = t('user', '邮箱不能为空');
+  } else if (!$ac->mail || $ac->mail != $v->mail) {
+    $error = user_default_validate_mail($v->mail);
+  }
+  
+  if (!$error) {
+    if (!$v->name) {
+      $error['name']['#error'][] = t('user', '用户名不能为空');
+    } else if (!$ac->name || $ac->name != $v->name) {
+      $error = user_default_validate_name($v->name);
+    }
+  }
+  
+  if (!$error) {
+    if (!$error = field_get_node_validate('user', 'field', $v, $ac)) {
+      /**
+       * 触发 hook_user_validate()
+       */
+      $error = module_invoke_all('user_validate', $v, $ac);
+    }
+  }
+  return $error;
+}
+
+/**
+ * 注册表单
+ */
+function user_register_form($op = 'user') {
+	global $conf;
+
+  // 准备注册表单之前，可对全局变量进行覆写，结合 hook_user_register_form()，实现不同的注册表单
+  module_invoke_all('user_before_register_form', $op);
+
+  $form['settings'] = array(
+    '#validate' => array('user_register_validate'),
+    '#ajax_validate' => true,
+    '#values_object' => true,
+    '#ajax_submit' => array(
+      'des' => true,
+      'options' => array(
+        'dataType' => 'script',
+        'url' => url('user/register', array('query' => array('ajax' => 'submit', 'redirect' => urlencode($_GET['redirect'])))),
+      ),
+    ),
+  );
+
+  $form['fields']['mail'] = array(
+    '#type' => 'textfield',
+    '#title' => t('user', '邮箱'),
+    '#required' => true,
+    '#weight' => -100,
+    '#description' => t('user', '该邮箱将用做接收密码等重要信息'),
+    '#attributes' => array(
+      'class' => "{email:true}"
+    ),
+  );
+
+  $form['fields']['op'] = array(
+    '#type' => 'hidden',
+    '#default_value' => $op,
+    '#constant' => 1
+  );
+
+  $form['fields']['name'] = array(
+    '#type' => 'textfield',
+    '#title' => t('user', '昵称'),
+    '#required' => true,
+    '#weight' => -90,
+    '#description' => t('user', '昵称长度 2-20，中英文皆可'),
+  );
+
+  $form['fields']['pass'] = array(
+    '#type' => 'password',
+    '#title' => t('user', '密码'),
+    '#required' => true,
+    '#weight' => -80,
+    '#description' => t('user', '密码区分大小写'),
+    '#attributes' => array(
+      'id' => 'password',
+    ),
+  );
+
+  $form['fields']['pass2'] = array(
+    '#type' => 'password',
+    '#title' => t('user', '确认'),
+    '#required' => true,
+    '#weight' => -79,
+    '#description' => t('user', '重复一次密码'),
+    '#attributes' => array(
+      'class' => "{equalTo:'#password'}"
+    ),
+  );
+
+  // 默认角色
+  $form['fields']['rid'] = array(
+    '#type' => 'hidden',
+    '#constant' => 1,
+    '#default_value' => var_get_key('user', 'default_role', 2),
+  );
+ 
+  if (($conf['user']['select_lang'] || $op == 'admin') && count($conf['languages']) > 1) {
+	  $form['fields']['language'] = array(
+	    '#type' => 'select',
+	    '#title' => t('user', '语言'),
+	    '#default_value' => $GLOBALS['language_code'],
+	    '#options' => array('' => t('user', '默认')) + $conf['languages'],
+	  );
+	}
+
+	if (($conf['user']['select_theme'] || $op == 'admin') && count($conf['themes']) > 1) {
+		
+	  foreach ($conf['themes'] as $theme) {
+	  	$themes[$theme['filename']] = $theme['name'];
+	  }
+	  
+	  $form['fields']['theme'] = array(
+	    '#type' => 'select',
+	    '#title' => t('user', '主题'),
+	    '#default_value' => $conf['default_theme'],
+	    '#options' => array('' => t('user', '默认')) + $themes,
+	  );
+  }
+
+  if ($conf['captcha']['user_register']['data']) {
+    $form['fields']['captcha'] = array(
+      '#type' => 'captcha',
+      '#required' => true,
+      '#title' => t('user', '验证'),
+      '#captcha' => $conf['captcha']['user_register'],
+    );
+  }
+  
+  $ac = new stdClass();
+  
+  field_get_node_form('user', 'field', $ac, $form);
+
+  module_alter_all('user_register_form', $form, $op, $ac);
+  
+  $form['fields']['button'] = array(
+    '#type' => 'submit',
+    '#weight' => 100,
+    '#submit' => 'user_register_submit',
+    '#value' => t('user', '确认注册'),
+    '#field_suffix' => l(t('user', '已经注册?'), 'user/login')
+  );
+  
+  return $form;
+}
+
+/**
+ * 验证用户名
+ */
+function user_default_validate_name($name) {
+  if ((mb_strlen($name, 'utf-8') < 2) || (mb_strlen($name, 'utf-8') > 20)) {
+     $t['name']['#error'][] = t('user', '昵称长度 2 - 20 字符');
+  } else if (strstr($name, '　') || !preg_match("/^[\w\x80-\xff-]+$/", $name)) {
+     $t['name']['#error'][] = t('user', '昵称含有非法字符');
+  } else if (db_query('SELECT name FROM {users} WHERE name = ?', array($name), array('return' => 'column'))) {
+    $t['name']['#error'][] = t('user', '!name 已经存在', array('!name' => $name));
+  }
+
+  return $t;
+}
+
+/**
+ * 验证邮件
+ */
+function user_default_validate_mail($mail) {
+  if ($msg = form_vali_mail($mail)) {
+    $t['mail']['#error'][] = $msg;
+  } else if (db_query('SELECT mail FROM {users} WHERE mail = ?', array($mail), array('return' => 'column'))) {
+     $t['mail']['#error'][] = t('user', '!name 已经存在', array('!name' => $mail));
+  }
+  return $t;
+}
+
+/**
+ * 注册验证
+ */
+function user_register_validate($form, &$value) {
+  if (!$t = user_default_validate_name($value['name'])) {
+    if (!$t = user_default_validate_mail($value['mail'])) {
+      if (!isset($value['pass']) || ($value['pass'] != $value['pass'])) {
+        $t['pass2']['#error'][] = t('user', '两次输入的密码不一致');
+      } else if (!$t = field_get_node_validate('user', 'field', $value['_dida_values'], NULL, $form)) {
+        $t = module_invoke_all('user_validate', $value['_dida_values']);
+      }
+    }
+  }
+  
+  return $t;
+}
+
+/**
+ * 注册表单提交处理
+ */
+function user_register_submit($form, &$value) {
+  if ($account = user_insert($value['_dida_values'])) {
+    if ($account->status == 1) {
+      if ($user = user_login(user_load($account->uid, true))) {
+        dd_goto(dd_get_token(var_get_key('user', 'redirect', 'user/' . $user->uid), $user, array('user', 'system')));
+      }
+    } else if ($GLOBALS['conf']['user']['status'] == 0) {
+      dd_set_message(t('user', '恭喜，注册成功了，你需要通过邮箱激活帐号'));
+      dd_goto('user/activation');
+    } else if ($GLOBALS['conf']['user']['status'] == -1) {
+      dd_set_message(t('user', '恭喜，注册成功了，请等待管理员激你的帐号'));
+      dd_goto(NULL);
+    }
+  } else {
+    dd_set_message(t('user', '抱歉，出现问题，注册失败了'));
+  }
+}
+
+/**
+ * 写入角色
+ */
+function user_set_roles($uid, $rid) {
+	db_exec('DELETE FROM {user_roles} WHERE uid = ?', array($uid));
+	if (is_array($rid)) {
+		foreach ($rid as $id) {
+			//if ($id && $id != var_get_key('user', 'anonymous_role', 1) && $id != var_get_key('user', 'default_role', 2)) {
+			if ($id && $id != var_get_key('user', 'anonymous_role', 1)) {
+			  db_exec('INSERT INTO {user_roles} (uid, rid) VALUES (?, ?)', array($uid, $id));
+			}
+		}
+	} else if ($rid && $rid != var_get_key('user', 'anonymous_role', 1)) {
+		db_exec('INSERT INTO {user_roles} (uid, rid) VALUES (?, ?)', array($uid, $rid));
+	}
+  user_set_role_count();
+}
+
+/**
+ * 统计各角色用户总数
+ */
+function user_set_role_count() {
+  if ($fetch = db_query('SELECT COUNT(rid) AS c, rid FROM {user_roles} GROUP BY rid')) {
+    foreach ($fetch as $o) {
+      db_exec('UPDATE {role} SET count = ? WHERE rid = ?', array($o->c, $o->rid));
+    }
+  }
+}
+
+/**
+ * 添加或更新角色
+ * @param (array) $role
+ */
+function user_save_role($role = array()) {
+  if (!$rid = db_query('SELECT rid FROM {role} WHERE name = ?', array($role['name']), array('return' => 'column'))) {
+    if (db_exec('INSERT INTO {role} (name, perm) VALUES (?, ?)', array($role['name'], ($role['perm'] ? serialize($role['perm']) : '')))) {
+      return db_last_insert_id();
+    }
+  } else if ($role['perm']) {
+    db_exec('UPDATE {role} SET perm = ? WHERE rid = ?', array(($role['perm'] ? serialize($role['perm']) : ''), $rid));
+  }
+  return $rid;
+}
+
+/**
+ * 写入用户
+ * @param (object) $value
+ *  将写入的用户数据，不做验证
+ */
+function user_insert($value) {
+  if (!isset($value->status)) {
+    $value->status = var_get_key('user', 'status', 1) == 1 ? 1 : 0;
+  }
+  
+  if (!isset($value->language) || $value->language == $GLOBALS['conf']['default_language']) {
+    $value->language = '';
+  }
+  
+  if (!isset($value->theme)) $value->theme = '';
+  $value->created = $_SERVER['REQUEST_TIME'];
+  $value->session = $_COOKIE[session_name()];
+  $value->host = ip_address();
+  
+  $salt = user_get_salt_pass($value->pass);
+  $value->pass = $salt['pass'];
+  $value->salt = $salt['salt'];
+  
+  if (db_write_record('users', $value)) {
+    if ($value->uid) {
+      user_set_roles($value->uid, $value->rid);
+      $value->roles = user_get_roles($uid, true);
+      
+      if (var_get_key('user', 'status', 0) == 0 && $value->status < 1) {
+        _user_activation($value->uid, $value->name, $value->mail, $_SERVER['REQUEST_TIME']);
+      }
+      
+      $value->nid = $value->uid;
+      
+      /**
+       * 触发 hook_user_insert();
+       */
+      module_alter_all('user_insert', $value);
+      
+      field_get_node_save('user', 'field', $value);
+      
+      unset($value->pass);
+      return $value;
+    }
+  }
+}
+
+/**
+ * 帐号激活邮件
+ */
+function _user_activation($uid, $name, $mail, $time) {
+  $site = $GLOBALS['conf']['site_global']['name'];
+  $pass = dd_rand_str();
+  if (db_exec('UPDATE {users} SET validate = ? WHERE uid = ?', array($pass, $uid))) {
+    $url = url('user/activation', array('query' => 'validate='. $pass . '&uid=' . $uid, 'absolute' => true));
+    dd_set_mail(
+      array(array($mail, $name)),
+      t('user', '激活你在 !site 的帐号', array('!site' => $site)),
+      t('user', '亲爱的 !name：<br />你于 %time 在 !site 进行了注册，以下是你的帐号激活链接：!url <br />未激活之前，你的帐号无法登录。<br />多次获取激活链接，以最后一次为准。<br />若该帐号并非你本人注册，请忽略此邮件。<br />!site', array(
+        '!name' => $name,
+        '%time' => format_date($time),
+        '!site' => $site,
+        '!url' => $url
+      ))
+    );
+    return true;
+  }
+}
+
+/**
+ * 找回密码
+ */
+function _user_newpass($uid, $name, $mail) {
+  $site = $GLOBALS['conf']['site_global']['name'];
+  $str = dd_rand_str();
+  $time = time();
+  if (db_exec('UPDATE {users} SET newpass = ?, active = ? WHERE uid = ?', array($str, $time, $uid))) {
+    $url = url('user/pass', array('query' => 'type=newpass&str=' . $str . '&uid=' . $uid, 'absolute' => true));
+    dd_set_mail(
+      array(array($mail, $name)),
+      t('user', '找回你在 !site 的密码', array('!site' => $site)),
+      t('user', '亲爱的 !name：<br />你于 %time 在 !site 请求找回密码，以下是你的密码修改链接：!url <br />通过本链接你可以直接修改密码，在成功修改密码之前，你的旧密码仍然可以登录。<br />本链接在 24 小时内有效，且只能使用一次，多次找回，以最后一次为准。<br />若该操作并非你本人发起，请注意你的帐号安全。<br />!site', array(
+        '!name' => $name,
+        '%time' => format_date($time),
+        '!site' => $site,
+        '!url' => $url
+      ))
+    );
+    return true;
+  }
+}
+
+/**
+ * 验证用户密码
+ * @param (array) $ac
+ *  需查询的用户，，uid、name、mail 必有其一，用于查询 salt
+ * @param (string) $pass
+ *  密码明文
+ * 
+ * @return (bool or object)
+ *  若该用户不存在或密码不匹配，返回 false。通过验证，返回用户对象，仅包含 uid name mail status
+ */
+function user_is_login_pass(array $ac, $pass) {
+  if (!empty($ac['uid'])) {
+    $user = db_query('SELECT uid, name, mail, status, salt, pass FROM {users} WHERE uid = ?',
+    array($ac['uid']), array('return' => 'one'));
+  } else if (!empty($ac['name'])) {
+    $user = db_query('SELECT uid, name, mail, status, salt, pass FROM {users} WHERE name = ?',
+    array($ac['name']), array('return' => 'one'));
+  } else if (!empty($ac['mail'])) {
+    $user = db_query('SELECT uid, name, mail, status, salt, pass FROM {users} WHERE mail = ?',
+    array($ac['mail']), array('return' => 'one'));
+  } else {
+    return false;
+  }
+  
+  if (!empty($user) && md5(md5($pass) . $user->salt) == $user->pass) {
+    unset($user->pass);
+    return $user;
+  } else {
+    return false;
+  }
+}
+
+/**
+ * 获取密码随机串和密码密文
+ * @param (string) $pass
+ *  密码明文
+ * @return (array) 返回密文和salt，salt 固定 6 位
+ *  array('salt' => '', 'pass' => '')
+ */
+function user_get_salt_pass($pass) {
+  $arr = array('salt' => dd_get_rand_string(6));
+  $arr['pass'] = md5(md5($pass) . $arr['salt']);
+  return $arr;
+}
+
+/**
+ * 获取用户的角色组
+ * @param (int) $uid
+ *  用户 id
+ * @param (bool) $clear
+ *  是否从数据库直接读取
+ */
+function user_get_roles($uid, $clear = NULL) {
+  static $roles;
+  if (!isset($roles[$uid]) || $clear) {
+    if ($uid > 0) {
+      if ($fetch = db_query('SELECT r.rid, r.name FROM {role} r INNER JOIN {user_roles} u ON r.rid = u.rid WHERE u.uid = ?', array($uid))) {
+        foreach ($fetch as $r) {
+          $roles[$uid][$r->rid] = $r->name;
+        }
+      }
+      if (!$roles[$uid]) {
+        $default_role = user_data_roles(var_get_key('user', 'default_role', 2));
+        $roles[$uid][$default_role->rid] = $default_role->name;
+      }
+    } else {
+      $roles[$uid][var_get_key('user', 'anonymous_role', 1)] = var_get_key('user', 'anonymous', '游客');
+    }
+  }
+  return $roles[$uid];
+}
+
+/**
+ * 获取用户文件限额
+ */
+function user_get_file_size($uid) {
+  static $limit;
+  if (!isset($limit[$uid])) {
+    /**
+     * 规则如下：
+     * 优先查询用户所属角色组设置，选取最大额度，作为限额。
+     * user_file_size_role_{rid}：角色设置若为 0，则表示按默认容量
+     * user_file_size：默认容量若为 0，则表示不限制
+     */
+    if ($uid > 0) {
+      global $user;
+      if ($uid == $user->uid) {
+        $roles = $user->roles;
+      } else {
+        $roles = user_get_roles($uid);
+      }
+      
+      $limit[$uid] = 0;
+      foreach ($roles as $rid => $role) {
+        $size = var_get('user_file_size_role_'.$rid, 0);
+        if ($limit[$uid] < $size) {
+          $limit[$uid] = $size;
+        }
+      }
+      if (!$limit[$uid]) {
+        $limit[$uid] = var_get('user_file_size', 30);
+      }
+    } else {
+      // 游客不限额
+      $limit[0] = 0;
+    }
+  }
+  return $limit[$uid];
+}
+
+/**
+ * 角色信息缓存
+ */
+function user_data_roles($rid = NULL) {
+  static $roles;
+  if (!isset($roles)) {
+    if (!$roles = var_get('user_roles')) {
+      if ($fetch = db_query('SELECT * FROM {role} ORDER BY rid ASC')) {
+        foreach ($fetch as $o) {
+          $roles[$o->rid] = $o;
+        }
+        var_set('user_roles', $roles);
+      }
+    }
+  }
+  return $roles[$rid]  ? $roles[$rid] : $roles;
+}
+
+function user_roles_opt() {
+  $opt = array();
+  if ($roles = user_data_roles()) {
+    foreach ($roles as $role) {
+      $opt[$role->rid] = $role->name;
+    }
+  }
+  return $opt;
+}
+
+// public user_login_form($url = NULL) {{{ 
+/**
+ * user_login_form
+ * 登录表单，主要用于区块。 
+ * @param string $redirect 
+ *  登录成功后跳转地址
+ * @access public
+ * @return array
+ */
+function user_login_form($redirect = NULL) {
+  global $conf;
+  
+  if (empty($redirect)) {
+    $query = '';
+
+    if ($query = dd_query_string_encode($_GET, array_merge(array('q', 'ajax'), array_keys($_COOKIE)))) {
+      $query = '&' . $query;
+    }
+
+    if (!empty($_GET['q']) && strpos($_GET['q'], 'user/login') === false) {
+      $query .= '&redirect=' . urlencode(url($_GET['q']) . '&1');
+    }
+
+    $url = url('user/login/ajax', array('query' => 'ajax=submit' . $query));
+  } else {
+    $url = url('user/login/ajax', array('query' => 'ajax=submit&redirect=' . urlencode(url($redirect))));
+  }
+  
+  $form['settings'] = array(
+    '#validate' => array('user_login_validate'),
+    '#ajax_validate' => true,
+    '#ajax_submit' => array(
+      'des' => true,
+      'options' => array(
+        'dataType' => 'script',
+        'url' => $url,
+      ),
+    ),
+  );
+
+  $form['fields']['mail'] = array(
+    '#type' => 'textfield',
+    '#title' => t('user', '邮箱'),
+    '#required' => true,
+    '#default_value' => $ac[0],
+    '#attributes' => array(
+      'id' => 'user_login',
+      'size' => 20,
+      'class' => "{required:true, messages:{required:'".t('user', '请输入邮箱')."'}}"
+    ),
+    '#description' => l(t('user', '未注册？'), 'user/register', array('attributes' => array('target' => '_parent')))
+  );
+  $form['fields']['pass'] = array(
+    '#type' => 'password',
+    '#title' => t('user', '密码'),
+    '#required' => true,
+    '#attributes' => array(
+      'size' => 20,
+      'class' => "{required:true, messages:{required:'". t('user', '请输入密码')."'}}"
+    ),
+    '#description' => l(t('user', '忘记密码？'), 'user/pass', array('attributes' => array('target' => '_parent')))
+  );
+  if ($conf['captcha']['user_login']['data']) {
+    $form['fields']['captcha'] = array(
+      '#type' => 'captcha',
+      '#required' => true,
+      '#title' => t('user', '验证'),
+      '#captcha' => array(
+        'image' => $conf['captcha']['user_login']['image'] ? '50x16' : 0,
+        'type' => $conf['captcha']['user_login']['type']
+      )
+    );
+  }
+  
+  $form['fields']['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('user', '登录'),
+    '#weight' => 1000,
+    '#prefix' => '<div id="user_login_form_submit" class="form_item form_item_submit">',
+  );
+  
+  $form['fields']['his'] = array(
+    '#type' => 'checkbox',
+    '#weight' => 1001,
+    '#options' => array(1 => t('user', '记住我')),
+    '#suffix' => '</div>'
+  );
+
+  module_alter_all('user_login_form', $form);
+
+  return $form;
+}
+// }}}
+
+/**
+ * 登录验证
+ */
+function user_login_validate(&$form, &$value) {
+  if (strpos($value['_dida_values']->mail, '@') !== false) {
+    $value['_dida_values']->name = NULL;
+    $user = user_is_login_pass(array('mail' => $value['_dida_values']->mail), $value['_dida_values']->pass);
+  } else {
+    $value['_dida_values']->name = $value['_dida_values']->mail;
+    $value['_dida_values']->mail = NULL;
+    
+    $user = user_is_login_pass(array('name' => $value['_dida_values']->name), $value['_dida_values']->pass);
+  }
+  
+  if (!empty($user)) {
+    unset($value['_dida_values']->pass, $value['pass']);
+    if (!$error = module_invoke_all('user_login_validate', $form, $value['_dida_values'])) {
+      if ($msg = _user_login_validate($user, $value['_dida_values'])) {
+        if ($msg === true) {
+          if ($_GET['ajax'] != 'submit') {
+            dd_goto(dd_get_token(var_get_key('user', 'redirect', 'user/' . $_SESSION['user']->uid), $_SESSION['user'], array('user', 'system')));
+          }
+        } else {
+          $error = $msg;
+        }
+      } else {
+        dd_set_message(t('user', '登录失败'), 'error');
+        return true;
+      }
+    }
+  } else {
+    $error['pass']['#error'][] = t('user', '帐号与密码不匹配');
+  }
+  
+  return $error;
+}
+
+/**
+ * 用户登录验证
+ * @param (object) $ac
+ *  用户对象
+ * @param (object) $value
+ *  如果是通过表单提交，表单值
+ */
+function _user_login_validate($ac, &$value = NULL) {
+  if ($ac->uid) {
+    switch ($ac->status) {
+      case 0:
+        $t['name']['#error'][] = t('user', '账号还未激活，<a href="!url">立即激活</a>', array('!url' => url('user/activation')));
+      break;
+      case 2:
+        $t['name']['#error'][] = t('user', '账号已冻结');
+      break;
+      case 3:
+        $t['name']['#error'][] = t('user', '账号已注销');
+    }
+    if ($t) return $t;
+    
+   
+    if (user_login(user_load($ac->uid), $value->his[1])) {
+      return true;
+    }
+  } else {
+    $t['name']['#error'][] = t('user', '密码不匹配');
+  }
+  return $t;
+}
+
+/**
+ * 载入用户信息，触发 hook_user_load()
+ */
+function user_load($uid, $clear = NULL, $field_loads = true, $module_loads = true) {
+  static $ac;
+
+  if (!isset($ac[$uid]) || $clear) {
+  	global $conf;
+  	$ac[$uid] = new stdClass();
+    
+    if ($ac[$uid] = db_query('SELECT * FROM {users} WHERE uid = ?', array($uid), array('return' => 'one'))) {
+      
+      unset($ac[$uid]->pass);
+      
+      if (!$ac[$uid]->language || !$conf['languages'][$ac[$uid]->language]) {
+      	$ac[$uid]->language = NULL;
+      }
+      
+      $ac[$uid]->roles = user_get_roles($uid, $clear);
+      
+      if ($ac[$uid]->data) {
+      	$ac[$uid]->data = unserialize($ac[$uid]->data);
+      } else {
+      	$ac[$uid]->data = array();
+      }
+      
+      $ac[$uid]->avatar = user_get_avatar($ac[$uid]->uid);
+      $ac[$uid]->title = user_get_current_name($ac[$uid]);
+      
+      /**
+       * 加载用户信息
+       * 触发 hook_user_load();
+       */
+      $ac[$uid]->nid = $ac[$uid]->uid;
+      
+      if ($field_loads) {
+        $ac[$uid]->ext = user_ext_load($uid);
+        field_get_node_load('user', 'field', $ac[$uid], $ac[$uid]);
+      }
+      
+      if ($module_loads) {
+        module_alter_all('user_load', $ac[$uid]);
+      }
+      
+      if (!isset($ac[$uid]->path)) {
+        $ac[$uid]->path = 'user/'.$ac[$uid]->uid;
+      }
+    }
+  }
+  
+  return $ac[$uid];
+}
+
+/**
+ * 载入用户信息，触发 hook_user_view()。注意，这是一个引用传递，模块不需要返回值，而是将自定义数据添加到 &$account
+ * 通常应使用模块名称做为对象名，方便主题制作 ，如 fields 模块定义的数据均在  $accout->fields 之中
+ * 假如设置使用默认布局 ，将触发 hook_user_page()，模块可以返回一个数组，如：
+ * return $array('#data' => '要显示的内容', '#weight' => -10) 或返回一个字符串 rerurn '要显示的内容';
+ * 最后所有模块需要显示的内容，按权重合并显示在用户主页。
+ * 通常情况 下，hook_user_page() 返回的内容和 hook_user_view() 的原始数据是一致的，前者仅多了一些 html 格式处理
+ * 这样，在用户选择自定义布局的情况下，也可以通过 $account 对象获取到模块自定义内容
+ * 假如设置交给特定模块处理， hook_user_view()、hook_user_page() 均不会执行，而是调用该模块  _module_user_view() 函数
+ * @param (object) $account
+ *  用户对象
+ */
+function user_view($account) {
+  if (!$account->uid) {
+    dd_get_access();
+  }
+  
+  /**
+   * 将用户页面完全交给某个模块来处理
+   */
+  if ($module = var_get_key('user', 'custom_view_module', 0)) {
+    $function = '_'.$module.'_user_view';
+    
+    if (function_exists($function)) {
+      return $function($account);
+    }
+  }
+  
+  $account->avatar = user_get_avatar($account->uid, '200x200');
+  
+  $account->title = user_get_current_name($account);
+  $title = t('user', '!name的主页', array('!name' => $account->title));
+  
+  field_get_node_view('user', 'field', $account, 1);
+  
+  unset($account->field_view['avatar']);
+
+  $account->tabs = array(l(t('user', '主页'), $account->path));
+  
+  module_alter_all('user_view_tabs', $account);
+  module_alter_all('user_view', $account);
+
+  if (!empty($account->tabs)) {
+    dd_set_tabs($account->tabs);
+  }
+  
+  if (!var_get_key('user', 'custom_view', 0)) {
+    global $user;
+    if ($data = _module_invoke_all('user_page', $account)) {
+      $i = 0;
+      foreach ($data as $module => $content) {
+        $row = array();
+        if (is_array($content)) {
+          $row['#weight'] = !isset($content['#weight']) ? $i : $content['#weight'];
+          $row['#data'] = $content['#data'];
+        } else {
+          $row['#weight'] = $i;
+          $row['#data'] = $content;
+        }
+        
+        $row['#data'] = '<div class="user_page_' . $module . '_view">' . $row['#data'] . '</div>';
+        
+        $contents[] = $row;
+        ++$i;
+      }
+      
+      uasort($contents, 'dd_form_cmp');
+      
+      foreach ($contents as $d) {
+        $account->content .= $d['#data'];
+      }
+    }
+  }
+  
+  dd_set_title(array($title));
+  return theme('user', $account);
+}
+
+/**
+ * @Implement of hook_user_page()
+ */
+function user_user_page($ac) {
+  $item[] = dd_get_strong(t('user', '注册时间')) . format_date($ac->created);
+  if ($ac->login) {
+    $item[] = dd_get_strong(t('user', '最近登录')) . format_date($ac->login);
+  }
+  if ($ac->field_view) {
+    foreach ($ac->field_view as $key => $data) {
+      if ($key != 'avatar') {
+        $item[] = array('data' => dd_get_strong($data['#name']) . $data['#content'], 'class' => 'user_field_view_'.$key);
+      } else {
+        $contents = '<div class="user_field_view_avatar">'.$data['#content'].'</div>';
+      }
+    }
+  }
+  
+  $contents .= theme('item_list', $item, NULL, 'ul', array('id' => 'user_view_fields'));
+  
+  return array('#data' => $contents, '#weight' => -100);
+}
+
+/**
+ * 用户登录，触发 hook_user_login()
+ * @param object $user 
+ * @param bool $history 
+ *  记住登录状态，即设置 cookie 有效期
+ * @access public
+ * @return object
+ */
+function user_login($user, $history = true) {
+  if ($user->status != 1) {
+    switch ($user->status) {
+      case 0:
+        $t = t('user', '账号还未激活，<a href="!url">立即激活</a>', array('!url' => url('user/activation')));
+      break;
+      case 2:
+        $t = t('user', '账号已冻结');
+      break;
+      case 3:
+        $t = t('user', '账号已注销');
+    }
+    dd_set_message($t);
+    return false;
+  }
+ 
+  user_session_reg($user);
+  
+  /**
+   * 登录成功
+   * 触发 hook_user_login();
+   */
+  module_alter_all('user_login', $user);
+  
+  if (empty($history)) {
+    dd_set_cookie('remember', 1, -1); // 有值，代表不保存登录状态，关闭浏览器则失效
+    dd_set_cookie('time', time(), -1);
+  } else {
+    setcookie('remember', 0, -1, '/', $GLOBALS['cookie_domain']);
+  }
+
+  dd_log('user_login', $user->name . '-' . $user->uid, 0, dd_get_referer($_SERVER['HTTP_REFERER']), 0, $user->uid);
+  
+  return $user;
+}
+
+/**
+ * @Implement of hook_logs_info()
+ */
+function user_logs_info() {
+  return array(
+    'user_login' => t('user', '用户登录'),
+  );
+}
+
+/**
+ * 登录更新 session
+ */
+function user_session_reg(&$ac) {
+  global $cookie_domain;
+
+  $ac->prevhost = $ac->host;
+  $ac->prevlogin = $ac->login;
+  $ac->host = ip_address();
+  $ac->old_session = $ac->session;
+  
+  session_unset();
+  unset($ac->pass);
+  unset($ac->init);
+  dd_set_cookie('time', $_SERVER['REQUEST_TIME'], $_SERVER['REQUEST_TIME'] + 31536000);
+  
+  $_SESSION['user'] = $ac;
+  session_regenerate_id();
+  
+  if (empty($_POST['__SETPHPSESSID']) && empty($_POST['__SETUID'])) {
+    db_exec('UPDATE {users} SET login = ?, count = count + 1, session = ?, host = ?, active = ? WHERE uid = ?',
+    array($_SERVER['REQUEST_TIME'], session_id(), $ac->host, $_SERVER['REQUEST_TIME'], $ac->uid));
+    $_SESSION['user']->__SETVALIDATE = NULL;
+  } else {
+    $_SESSION['user']->__SETVALIDATE = time();
+  }
+  
+  $ac->session = session_id();
+}
+
+/**
+ * 清除用户 session 信息缓存 
+ * @param int $uid 
+ * @access public
+ * @return void
+ */
+function user_clear_session($uid) {
+  if ($GLOBALS['user']->uid != $uid) return false;
+  
+  if ($_SESSION['user'] = user_load($uid, 1)) {
+    global $user;
+    $user = $_SESSION['user'];
+  }
+}
+
+/**
+ * @Implement of hook_system_site_captcha()
+ */
+function user_system_site_captcha($op) {
+  if ($op == 'fields') {
+    return array(
+      'user_login' => array(
+        'title' => t('user', '登录'),
+        // 'attributes' => array() // 自定义表单字段参数
+      ),
+      'user_register' => array(
+        'title' => t('user', '注册'),
+      ),
+    );
+  }
+}
+
+/**
+ * @Implement of hook_site_menu()
+ */
+function user_site_menu(&$menu) {
+  global $user;
+  
+  $menu['front'] = array(
+    '#data' => l(t('user', '首页'), NULL),
+    '#weight' => -1000,
+  );
+  
+  if (!$user->uid) {
+    $menu['user'] = array(
+      'login' => array(
+        '#weight' => 999,
+        '#data' => l(t('user', '登录'), 'user/login'),
+        '#childrens' => array(),
+      )
+    );
+    $menu['user']['login']['#childrens'][] = l(t('user', '登录'), 'user/login');
+    if (user_is_register()) {
+      $menu['user']['login']['#childrens'][] = $menu['user']['register'] = array(
+        '#data' => l(t('user', '注册'), 'user/register'),
+      );
+      $menu['user']['register']['#weight'] = 1000;
+    }
+    $menu['user']['login']['#childrens'][] = l(t('user', '找回密码'), 'user/pass');
+  } else {
+    if ($user->uid == 1) {
+      $menu['admin'] = array(
+        '#weight' => 999,
+        '#data' => l(t('user', '网站管理'), 'admin'),
+        '#childrens' => array(
+          l(t('user', '缓存管理'), 'admin/cache'),
+          l(t('user', '主题管理'), 'admin/themes'),
+          l(t('user', '模块管理'), 'admin/modules'),
+          l(t('user', '用户设置'), 'admin/users/settings'),
+          l(t('user', '站点设置'), 'admin/settings'),
+        )
+      );
+    }
+    $menu['user'] = array(
+      '#weight' => 1000,
+      '#data' => theme('username', $user),
+      '#childrens' => array(
+        l(t('user', '个人中心'), 'user/center'),
+        l(t('user', '个人主页'), $user->path),
+        l(t('user', '编辑资料'), 'user/center/edit'),
+        l(t('user', '修改密码'), 'user/center/newpass'),
+        l(t('user', '安全离开'), 'user/logout', array('query' => 't=' . $_SERVER['REQUEST_TIME'])),
+      )
+    );
+  }
+}
+
+/**
+ * @Implement of hook_token_replace()
+ */
+function user_token_replace($text, $value = NULL) {
+	if (!is_object($value)) $value = $GLOBALS['user'];
+	$args = array(
+		'[uid]' => $value->uid,
+		'[name]' => $value->name,
+		'[mail]' => $value->mail,
+		'[theme]' => $value->theme,
+		'[language]' => $value->language,
+		'[created]' => $value->created,
+	);
+	return strtr($text, $args);
+}
+
+/**
+ * @Implement of hook_token_list()
+ */
+function user_token_list() {
+	return array(
+		'[uid]' => array(
+			'title' => t('user', '用户 id'),
+		),
+		'[name]' => array(
+			'title' => t('user', '用户名'),
+		),
+		'[mail]' => array(
+			'title' => t('user', '用户邮箱'),
+		),
+		'[theme]' => array(
+			'title' => t('user', '用户主题'),
+		),
+		'[language]' => array(
+			'title' => t('user', '用户语言'),
+		),
+		'[created]' => array(
+			'title' => t('user', '注册时间'),
+		)
+	);
+}
+
+/**
+ * @Implement of hook_field_call_group()
+ */
+function user_field_call_group($type = NULL) {
+  $groups = array(
+    'field' => array(
+    	'title' => t('user', '用户字段'),
+      'sum' => 0,
+      //'not_cache' => false, // 默认会缓存字段到主配置文件。若字段数据较多，请设置为 true，则缓存
+      //'term' => 1, // 只允许添加传统型分类，即 标签、下拉框、单选、复选
+      //'type' => array('tags'), // 允许的类型，优先级高于 term
+    	'level' => 0, // 分类层级级数，0 则为不限制(实际最多 10 级)
+      //'description' => t('user', '描述'),
+    )
+  );
+  return $type ? $groups[$type] : $groups;
+}
+
+/**
+ * @Implement of hook_field_get_node_access()
+ *   自定义字段权限
+ */
+function user_field_get_node_access($op, $field, $node = NULL, $ac) {
+  global $user;
+
+  if ($field->module == 'user' && $field->type == 'field') {
+    switch ($op) {
+      case 'view':
+        if (isset($field->data['access']['display'])) {
+          $field->is_access = $field->data['access']['display'] == 0 || ($field->data['access']['display'] == 1 && $node->uid = $ac->uid);
+        }
+      break;
+      case 'update':
+        // 已通过基本验证，且设置了填写时机才需要进一步验证
+        if (isset($field->data['access']['input']) && !empty($field->is_access)) {
+          // 验证填写时机，字段可设置在注册或编辑时填写
+          if (!empty($field->data['access']['input'][3])) {
+            // 只允许超级用户填写，通常应用于超级管理员帮助普通用户填写某些字段信息
+            $field->is_access = $user->uid == 1;
+          } else {
+            $field->is_access = ($ac->uid > 0 && !empty($field->data['access']['input'][2])) || !empty($field->data['access']['input'][1]);
+          }
+        }
+    }
+  }
+}
+
+/**
+ * @Implement of hook_field_call_form()
+ */
+function user_field_call_form(&$field, &$form) {
+  if ($field->module != 'user') return;
+  
+  $form['fields']['data']['access']['input'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('user', '时机'),
+    '#default_value' => $field->data['access']['input'],
+    '#options' => array(
+      1 => t('user', '注册时填写'),
+      2 => t('user', '编辑时填写'),
+      3 => t('user', '超级用户填写'),
+    )
+  );
+
+  $form['fields']['data']['access']['display'] = array(
+    '#type' => 'radio',
+    '#title' => t('user', '查看'),
+    '#default_value' => $field->data['access']['display'],
+    '#options' => array(
+      t('user', '允许所有人查看'),
+      t('user', '只允许自己查看'),
+      t('user', '只允许超级用户查看'),
+    )
+  );
+
+  if (in_array($field->field_type, field_get_term_type())) {
+    $form['fields']['data']['index'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('user', '索引'),
+      '#default_value' => $field->data['index'],
+      '#description' => t('user', '以链接索引具有相同选择的用户')
+    );
+  }
+}
+
+/**
+ * @Implement of hook_field_term_view()
+ */
+function user_field_term_view($term) {
+  if ($fetch = pager_query('SELECT u.uid, u.name FROM {users} u INNER JOIN {fields_term_node} t ON u.uid = t.nid WHERE t.tid = ? ORDER BY u.uid DESC',
+  30, 0, NULL, array($term->tid))) {
+    foreach ($fetch as $o) {
+      $data = '<span class="user_field_list_avatar">'.img(user_get_avatar($o->uid, '100x100'), $o->name, $o->name).'</span>';
+      $data .= '<span class="user_field_list_user">'.theme('username', $o).'</span>';
+      $items[] = $data;
+    }
+    
+    $output = theme('item_list', $items, NULL, 'ul', array('id' => 'user_term_list_view'));
+    $output .= pager_view();
+  } else {
+    $output = system_no_content();
+  }
+  
+  return $output;
+}
+
+/**
+ * @Implement of hook_field_view()
+ */
+function user_field_view($field) {
+  if ($fetch = pager_query('SELECT DISTINCT(t.nid), u.uid, u.name, f.tid, f.name AS term FROM {users} u INNER JOIN {fields_term_node} 
+  t ON u.uid = t.nid INNER JOIN {fields_term} f ON f.tid = t.tid WHERE f.field_id = ? 
+  ORDER BY u.uid DESC', 30, 0, NULL, array($field->field_id))) {
+    foreach ($fetch as $o) {
+      $data = '<span class="user_field_list_avatar">'.img(user_get_avatar($o->uid, '100x100'), $o->name, $o->name).'</span>';
+      $data .= '<span class="user_field_list_term">'.l($o->term, 'category/'.$o->tid).'</span>';
+      $data .= '<span class="user_field_list_user">'.theme('username', $o).'</span>';
+      $items[] = $data;
+    }
+    
+    $output = theme('item_list', $items, NULL, 'ul', array('id' => 'user_field_list_view'));
+    $output .= pager_view();
+  } else {
+    $output = system_no_content();
+  }
+  
+  return $output;
+}
+
+/**
+ * @Implement of hook_block_list()
+ */
+function user_block_list($theme) {
+  return array(
+    'login' => array(
+        'title' => t('user', '用户登录'),
+        'region' => 'left',
+        'visibility' => 1,
+        'weight' => -30
+      )
+    );
+}
+
+/**
+ * @Implement of hook_block_view()
+ */
+function user_block_view($theme, $config = NULL) {
+  if ($config->delta == 'login' && $GLOBALS['user']->uid == 0 && arg(1) != 'login') {
+    return array(
+      'title' => $config->title,
+      'content' => dd_get_form('user_login_form')
+    );
+  }
+}
+
+/**
+ * 查询是否设置了头像字段，默认头像字段为 avatar
+ */
+function user_get_avatar_fid() {
+  static $fid;
+  if (!isset($fid)) {
+    $fid = false;
+    if ($field = field_get_cache_field_key('user', 'field', 'avatar')) {
+      if ($field->field_type == 'file') {
+        $fid = $field->field_id;
+      }
+    }
+  }
+  return $fid;
+}
+
+/**
+ * 获取用户头像
+ * @param (int) $uid
+ *  用户 id
+ */
+function user_get_avatar($uid, $size = NULL, $style = 'scale') {
+  static $data;
+
+  if (!isset($data[$uid])) {
+    $data[$uid] = var_get_key('user', 'default_logo', 'misc/images/avatar.gif');
+
+    // 防止上传名称 md5 设置切换，引起冲突
+    if (var_get('file_upload_rename', 0)) {
+      $filepath = array(
+        file_directory_path() . '/avatar/' . md5($uid . '.jpg') . '.jpg',
+        file_directory_path() . '/avatar/' . $uid . '.jpg',
+      );
+    } else {
+      $filepath = array(
+        file_directory_path() . '/avatar/' . $uid . '.jpg',
+        file_directory_path() . '/avatar/' . md5($uid . '.jpg') . '.jpg',
+      );
+    }
+
+    foreach ($filepath as $path) {
+      if (is_file($path)) {
+        $data[$uid] = $path;
+        continue;
+       }
+    }
+  }
+  
+  if ($size && $data[$uid] != var_get_key('user', 'default_logo', 'misc/images/avatar.gif')) {
+    $data[$uid] = image_get_thumb('thumb_'.$uid, $data[$uid], $size, $style);
+  }
+  
+  return $data[$uid];
+}
+
+/**
+ * 输出用户名或带链接的用户名，
+ * @param (object) $ac
+ */
+function theme_username($ac, $link = true) {
+
+  if ($ac->uid > 0) {
+    if ($GLOBALS['user']->uid == $ac->uid) {
+      // 当前用户，连接到个人中心
+      $output = l($ac->name, 'user/center');
+    } else if ($link && user_is_user_view($ac)) {
+      // 有浏览个人主页权限的用户
+      if (!empty($ac->path)) {
+        $output = l($ac->name, $ac->path);
+      } else {
+        $output = l($ac->name, 'user/' . $ac->uid);
+      }
+    } else {
+      $output = $ac->name;
+    }  
+  } else {
+    $output = ($ac->name ? $ac->name : var_get_key('user', 'anonymous', t('user', '游客'))) . '(<em>未登录</em>)';
+  }
+
+  return $output;
+}
+
+/**
+ * @Implement of hook_alias_reservation()
+ */
+function user_alias_reservation() {
+	return array('user/');
+}
+
+/**
+ * @Implement of hook_share_fav()
+ */
+function user_share_fav() {
+  return array(
+    'qq_shuqian' => array(
+      'title' => t('user', 'QQ 书签'),
+      'href' => 'http://shuqian.qq.com/post?title=<title>&uri=<url>',
+      'icon' => 'misc/icon/share_qq.gif',
+    ),
+    'baidu_cang' => array(
+      'title' => t('user', 'Baidu 搜藏'),
+      'href' => 'http://cang.baidu.com/do/add?it=<title>&iu=<url>&dc=<desc>&tn=<tags>',
+      'icon' => 'misc/icon/share_baidu.gif',
+    ),
+    'google_bookmark' => array(
+      'title' => t('user', 'Google 书签'),
+      'href' => 'http://www.google.com/bookmarks/mark?op=edit&bkmk=<url>&title=<title>&labels=<tags>&annotation=<desc>',
+      'icon' => 'misc/icon/share_google.gif',
+    ),
+    'kaixin001' => array(
+      'title' => t('user', '开心网'),
+      'href' => 'http://www.kaixin001.com/repaste/share.php?rurl=<url>&rcontent=<url>&rtitle=<title>',
+      'icon' => 'misc/icon/share_kaixin.gif',
+    ),
+    'renren' => array(
+      'title' => t('user', '人人网'),
+      'href' => 'http://share.renren.com/share/buttonshare.do?link=<url>&title=<title>',
+      'icon' => 'misc/icon/share_renren.gif',
+    ),
+    'douban' => array(
+      'title' => t('user', '豆瓣网'),
+      'href' => 'http://www.douban.com/recommend/?url=<url>&title=<title>',
+      'icon' => 'misc/icon/share_douban.gif',
+    ),
+    'sina_t' => array(
+      'title' => t('user', '新浪微博'),
+      'href' => 'http://v.t.sina.com.cn/share/share.php?url=<url>&title=<title>&pic=<pic>',
+      'icon' => 'misc/icon/share_sina.gif',
+    ),
+    'qq_t' => array(
+      'title' => t('user', '腾讯微博'),
+      'href' => 'http://v.t.qq.com/share/share.php?title=<title>&url=<url>&title=<title>&pic=<pic>',
+      'icon' => 'misc/icon/share_qq_weibo.png',
+    ),
+  );
+}
+/**
+ * @Implement of hook_theme()
+ */
+function user_theme() {
+  return array(
+		'username' => array(
+		  'fun' => 'theme_username',
+      'args' => array('account', 'link'),
+		),
+    'user' => array(
+      'tpl' => 'user.tpl.php',
+      'args' => array('account'),
+    ),
+    'user_page' => array(
+      'tpl' => 'user_page.tpl.php',
+      'args' => array('account', 'type'),
+    ),
+    'user_center' => array(
+			'tpl' => 'user_center.tpl.php',
+			'args' => array('center'),
+		),
+  );
+}
+
+/**
+ * 
+ * @Implement of hook_template_preprocess_x()
+ * 
+ * 个人中心模板文件加载顺序：
+ * user_center_{$center->type}.tpl.php
+ * user_center.tpl.php
+ * 
+ */
+function user_template_preprocess_user_center(&$var, $hook) {
+  if (isset($var['center']) && $var['center']->type) {
+    $var['theme_config']->tpl[] = 'user_center_' . $var['center']->type . '.tpl.php';
+  }
+}
+
+/**
+ * 
+ * @Implement of hook_template_preprocess_x()
+ * 
+ * 个人主页扩展页面模板文件加载顺序：
+ * user_page_{$type}.tpl.php
+ * user_page.tpl.php
+ * 
+ */
+function user_template_preprocess_user_page(&$var, $hook) {
+  if (isset($var['account']) && $var['type']) {
+    $var['theme_config']->tpl[] = 'user_page_' . $var['type'] . '.tpl.php';
+  }
+}
+
+/**
+ * @Implement of hook_cron()
+ */
+function user_cron($last_timestramp) {
+  user_set_role_count();
+}
+
+/**
+ * @Implement of hook_system_cache_clear()
+ */
+function user_system_cache_clear($op = 'list', $v = NULL) {
+  switch ($op) {
+    case 'submit':
+      if ($v['value']['cache_hook']) {
+        cache_del('cid', 'user_center_menu_data');
+      }
+  }
+}
+
+

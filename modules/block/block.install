@@ -1,0 +1,123 @@
+<?php
+// $Id$
+function block_schema() {
+  $schema['blocks'] = array(
+    'description' => '区块',
+    'fields' => array(
+      'bid' => array(
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'module' => array(
+        'type' => 'varchar',
+        'length' => 64,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => '模块名称',
+      ),
+      'theme' => array(
+        'type' => 'varchar',
+        'length' => 64,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => '主题名称',
+      ),
+      'region' => array(
+        'type' => 'varchar',
+        'length' => 64,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => '区域标识',
+      ),
+      'delta' => array(
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => '模块内部编号',
+      ),
+      'title' => array(
+        'type' => 'varchar',
+        'length' => 64,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => '默认标题',
+      ),
+      'weight' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => '权重 id',
+      ),
+      'visibility' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+    		'size' => 'tiny',
+        'default' => 1,
+        'description' => '是否显示',
+      ),
+      'cache' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+    		'size' => 'tiny',
+        'default' => 1,
+        'description' => '是否缓存',
+      ),
+      'settings' => array(
+        'type' => 'text',
+        'not null' => FALSE,
+        'size' => 'big',
+        'serialize' => true,
+        'description' => '其它设置'
+      )
+    ),
+    'indexes' => array(
+      'list' => array('theme', 'region', 'weight', 'visibility')
+    ),
+    'unique keys' => array(
+      'tmd' => array('theme', 'module', 'delta'),
+    ),
+    'primary key' => array('bid'),
+  );
+  $schema['boxes'] = array(
+  	'description' => '文本区块',
+  	'fields' => array(
+      'bid' => array(
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'title' => array(
+        'type' => 'varchar',
+        'length' => 64,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => '默认标题',
+      ),
+      'body' => array(
+        'type' => 'text',
+        'not null' => FALSE,
+        'size' => 'big',
+        'description' => '内容'
+      ),
+      'format' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+    		'size' => 'tiny',
+        'default' => 0,
+        'description' => '输入格式',
+      ),
+  	),
+  	'primary key' => array('bid'),
+  );
+  $schema['cache_block'] = module_get_table('system', 'cache');
+  $schema['cache_block']['description'] = '区块缓存';
+  return $schema;
+}
+
+function block_install() {
+  $ret = array();
+  $ret = module_install_schema('install', 'block');
+  return $ret;
+}

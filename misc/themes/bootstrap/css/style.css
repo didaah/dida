@@ -1,0 +1,5 @@
+/* $Id$ */
+.item_pager ul.pager {
+  clear: both;
+  overflow: hidden;
+}

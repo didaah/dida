@@ -1,0 +1,29 @@
+<?php
+// $Id$
+$info = array(
+  'name' => 'default',
+  'ver' => '1.0',
+  'ui_theme' => 'base', // 设置 jquery ui 主题，若不设置，则为 base
+  'language' => 'zh-hans', // 主题默认语言，可选
+  'created' => mktime(21, 16, 0, 9, 8, 2009), // 创建时间，可选
+  'updated' => mktime(10, 32, 0, 11, 18, 2009), // 更新时间，可选
+  'description' => '缺省主题', //描述 ，可选
+  'preview_original' => 'images/preview_original.png', // 预览原图，相对路径，可选
+  'preview_thumb' => 'images/preview_thumb.png', // 预览缩略图，可选，和原图同时提供
+  'region' => array( // 定义页面区域，在 page.tpl.php 中，可使用 $left、$right 等调用，主体内容区域为 $content，不需要设置
+  	'left' => '左栏',
+  	'right' => '右栏',
+  	'bottom' => '底部',
+  ),
+  'framework' => 'default', // 主题框架，默认将使用 default。主题框架位于 misc/themes 下
+  'styles' => array( // 附加css，相对于主题文件夹，如：css/my.css。若无，则默认加载 css/style.css
+    'css/style.css'
+  ),
+  'scripts' => array(), // 附加js，相对于主题文件夹，如：js/my.js
+  'styles_remove' => array( // 指定要移除的 css
+    //'misc/system/admin.css' => true,
+  ),
+  'scripts_remove' => array( // 指定要移除的 js
+    //'misc/dida.js' => true,
+  ),
+);

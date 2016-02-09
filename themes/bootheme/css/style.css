@@ -1,0 +1,556 @@
+/*$Id$*/
+a:hover, a:active, a.active {
+  color:#CC6600;
+}
+
+ul.site_menu_children {
+  display: none;
+}
+
+#header .brand {
+  padding: 5px 0;
+  margin: 0;
+}
+
+#header .logo img {
+  max-height: 30px;
+  _height: 30px;
+}
+
+#main {
+  margin-top: 50px;
+}
+
+#footer {
+  background-color: #F5F5F5;
+  border-top: 1px solid #E5E5E5;
+  margin-top: 20px;
+  padding: 30px 0;
+  color: #777777;
+  text-align: center;
+  width: 100%;
+}
+
+.dd_item_lang_change {
+  text-align: center;
+}
+
+/*table*/
+table select {
+  margin-bottom: 0;
+}
+
+.table th, .table td {
+  vertical-align: inherit;
+}
+
+.even, thead {
+  background: #F9F9F9;
+}
+
+.admin_themes_table th.path {
+  width: 35%;
+}
+
+.admin_themes_table th,
+.admin_themes_table td {
+  text-align: center;
+}
+
+#system_modules_page th,
+#system_modules_page td {
+  text-align: center;
+}
+
+#system_modules_page td .item-list {
+  text-align: left;
+}
+
+td.table_submit {
+  text-align: right;
+}
+
+#system_modules_page th.description {
+  width: 45%;
+}
+
+#system_modules_page th.info {
+  width: 40%;
+}
+
+#system_cache_clear .form_checkbox_option {
+  display: block;
+}
+
+#dd_database_debug .dd_database_debug_args2,
+#dd_database_debug .dd_database_debug_args1 {
+  width: 30%;
+}
+
+.pager .pager_form_go_input {
+  width: 35px;
+  text-align: center;
+  margin: 0;
+}
+
+/*misc*/
+.right {
+  text-align: right;
+}
+
+.left {
+  text-align: left;
+}
+
+.center {
+  text-align: center;
+}
+
+label {
+  display: inline;
+}
+
+.center_table th,
+.center_table td {
+  text-align: center;
+}
+
+.table_fixed_header_wrapper_clone {
+  height: 40px;
+  line-height: 40px;
+  z-index: 9999;
+  text-align: left;
+}
+
+.table_fixed_header_wrapper {
+  position: relative;
+  overflow: auto;
+  z-index: 1000;
+}
+
+.table_fixed_header_wrapper_clone table, 
+.table_fixed_header_wrapper table {
+  max-width: none;
+}
+
+.system_no_content {
+  text-align: center;
+}
+
+ul {
+  margin: 0 0 10px 5px
+}
+
+ul ul {
+  margin: 0 0 10px 10px
+}
+
+li {
+  list-style: none outside none;
+}
+
+span.form_error,
+#ajax_description,
+.error {
+  color: #FF0000;
+}
+
+#ajax_description {
+  padding: 5px 0;
+}
+
+.ext_sort_order {
+  padding: 0 5px;
+}
+
+.sort_active_desc {
+	padding-right: 14px;
+  background: url(/misc/images/arrow-desc.png) right 0 no-repeat;
+}
+
+.sort_active_asc {
+	padding-right: 16px;
+  background: url(/misc/images/arrow-asc.png) right 0 no-repeat;
+}
+
+/*fieldset*/
+fieldset {
+  margin: 10px 0;
+  padding: 0;
+  border: 1px solid #CCCCCC;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.075) inset;
+  transition: border 0.2s linear 0s, box-shadow 0.2s linear 0s
+}
+
+fieldset.fieldset-hide {
+  border: none;
+  border-top: 1px solid #CCCCCC;
+}
+
+.fieldset-wrapper {
+  padding: 5px;
+}
+
+legend {
+  line-height: normal;
+  width: auto;
+  padding: 0 0 0 16px;
+  margin: 0 0 0;
+  font-weight: bold;
+  font-size: 12px;
+  border: none;
+}
+
+legend.desc {
+  background: url(/misc/images/arrow-desc.png) left 0 no-repeat;
+}
+
+legend.asc {
+  background: url(/misc/images/arrow-asc.png) left 0 no-repeat;
+}
+
+.ui-datepicker select.ui-datepicker-month, .ui-datepicker select.ui-datepicker-year {
+  width: 40%;
+}
+
+.js_messageShow {
+  position: fixed;
+  top: 50px;
+  right: 45%;
+  _position: absolute;
+  padding: 30px 100px;
+  border: 1px solid #ccc;
+  background: #fff;
+  z-index: 100;
+}
+
+/*form*/
+span.option_label,
+span.form_radio_text {
+  cursor: pointer;
+}
+
+select {
+  width: auto;
+}
+
+input.error,
+input.error:focus {
+  border-color: #B94A48;
+}
+
+.form_value_textarea {
+  width: 65%;
+}
+
+.form_value_text {
+  min-width: 400px;
+}
+
+button, input, select, textarea {
+  vertical-align: baseline;
+}
+
+label.form_required {
+  color: #588658;
+}
+
+.dd_label {
+  color: #365A36;
+}
+
+.radio.inline, .checkbox.inline {
+  padding-top: 0;
+}
+
+.radio, .checkbox {
+  min-height: inherit;
+}
+
+.form_radio_field .form_value_radio {
+  margin: 0 3px 0 6px;
+}
+
+span.form_error span {
+  padding: 0 3px;
+}
+
+span.form_error,
+span.form_error span,
+.form_item_textfield .error,
+.dd_label_value,
+.dd_label_select,
+.dd_label_file,
+.dd_label_weight,
+.dd_label_password,
+.dd_label_radio,
+.dd_label_textfield,
+.dd_label_checkbox {
+  display: inline;
+}
+
+.form_description {
+  color: #7E8186;
+  padding: 0 4px;
+}
+
+.form_description_format {
+  display: block;
+}
+
+.add-on {
+  padding: 0 3px;
+  color: #777;
+}
+
+#system_cache_clear .inline {
+  margin-left: 0;
+}
+
+#user_admin_new_pass .dd_label,
+#user_admin_edit_form .dd_label,
+#content_admin_type_form .dd_label,
+.dd_get_form_meta_fields .dd_label,
+#system_site_error .dd_label,
+#user_set_settings .dd_label,
+#_user_center_newpass .dd_label,
+#user_edit_form .dd_label,
+#editor_admin_form .dd_label,
+#system_site_settings .dd_label {
+  display:-moz-inline-box;
+  display:inline-block;
+  width: 140px;
+  text-align: right;
+}
+
+#content_admin_type_form .dd_label,
+.dd_get_form_meta_fields .dd_label,
+#system_site_error .dd_label,
+#editor_admin_form .dd_label {
+  width: 120px;
+  text-align: left;
+}
+
+#system_site_settings_type_submit,
+#user_admin_new_pass_type_button,
+#user_admin_edit_form_type_submit,
+#user_set_settings_type_submit,
+#_user_center_newpass_submit,
+#user_edit_form_submit {
+  margin-left: 140px;
+}
+
+#system_site_settings_admin_language .form_description {
+  display: block;
+  padding: 0;
+  margin-left: 140px;
+}
+
+#editor_admin_form .fieldset-wrapper .dd_label {
+  width: 60px;
+  margin: 0 5px;
+}
+
+#editor_admin_settings div {
+  display: inline;
+  margin-left: 5px;
+}
+
+.block #user_login_form {
+  padding: 8px 0;
+}
+
+.block #user_login_form .textfield,
+.block #user_login_form .password {
+  width: 150px;
+}
+
+.block #user_login_form label.error,
+.block #user_login_form .form_description {
+  display: block;
+  text-align: right;
+}
+
+.block #user_login_form_submit {
+  text-align: right;
+  margin-right: 5px;
+}
+
+#print .user_login_form #user_login_form_type_submit,
+.block #user_login_form_type_submit {
+  margin-right: 5px;
+}
+
+#print .user_login_form {
+  width: 550px;
+  margin: 0 auto;
+
+}
+/*block*/
+.sidebar .block {
+  border-radius: 4px;
+  border: 1px solid #CCCCCC;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.075) inset;
+  transition: border 0.2s linear 0s, box-shadow 0.2s linear 0s;
+  margin-bottom: 8px;
+}
+
+.block .block_content {
+  padding: 0 5px;
+}
+
+.sidebar .block h3.block_title {
+  text-align: center;
+  border-bottom: 1px solid #CCCCCC;
+  margin: 0;
+}
+
+#block_system_adminLink .item_click_op {
+	background: url(/misc/images/arrow-desc.png) right center no-repeat;
+	float: right;
+	display: block;
+	width: 13px;
+  height: 26px;
+  line-height: 26px;
+  cursor: pointer;
+}
+
+#block_system_adminLink .item-list-hide {
+  background: url(/misc/images/arrow-asc.png) right center no-repeat;
+}
+
+#block_system_adminLink .item-list h3 {
+  line-height: 28px;
+  font-size: 16px;
+  margin: 0 0 5px 0;
+  border-bottom: 1px solid #ccc;
+  cursor: crosshair;
+}
+
+#block_system_adminLink .dida_sorttable_button {
+  text-align: center;
+  padding: 10px 0;
+  background: #D9EDF7;
+  border: #BCE8F1;
+  border-radius: 4px;
+}
+
+.system_admin_block_link_remove {
+  display: block;
+  text-align: right;
+  color:#CC6600;
+  cursor: pointer;
+}
+
+#block_system_adminLink .item_admin_menus a {
+  padding: 3px 0 3px 25px;
+  display: block;
+}
+
+#block_system_adminLink .item_admin_menus a.active {
+  text-align: right;
+  margin: 0;
+  padding: 5px 0;
+  color: #FFFFFF;
+  background-color: #0088CC;
+}
+
+#block_admin_form_submit,
+#block_admin_form .block_item {
+  clear: both;
+}
+
+#block_admin_form .block_item label,
+#block_admin_form .block_item ul,
+#block_admin_form .block_item span,
+#block_admin_form .block_item input,
+#block_admin_form .block_item li,
+#block_admin_form .block_item div,
+#block_admin_form .block_item select {
+  float: left;
+  padding: 0 4px;
+}
+
+#block_admin_form .block_item div.title {
+  font-weight: bold;
+  font-size: 14px;
+  color: #000000;
+  width: 120px;
+}
+  
+#block_admin_form .block_item a {
+  padding: 0 3px;
+}
+
+#block_admin_form .block_item {
+  overflow: hidden;
+  margin: 5px 0;
+  border-bottom: 1px solid #DDDDDD;
+}
+
+/*comment*/
+#comment_form textarea, #comment_form .collapsible {
+  width: 65%;
+  padding: 5px;
+}
+
+#comment_form_type_title {
+  width: 55%;
+}
+
+/*content*/
+.content_view_content_header {
+  font-size: 12px;
+  color: #666;
+  padding: 5px 0;
+  border-bottom: 1px solid #ddd;
+  text-align: right;
+}
+
+/*field*/
+.content_view_content_fields {
+  margin: 5px 0;
+  border-bottom: 1px solid #ddd;
+}
+
+#field_export_content_view {
+  width: 99%;
+  height: 350px;
+}
+
+/*user center*/
+#user-center {
+  overflow: hidden;
+  height: auto;
+}
+
+#user-center-header {
+  text-align: right;
+  border-bottom:1px solid #ccc;
+  padding-right: 5px;
+  margin: 0;
+}
+
+#user-center-link {
+  text-align: center;
+  float: left;
+  padding: 0;
+  width: 18%;
+}
+
+#user-center-body {
+  border-left: 1px solid #ccc;
+  min-height: 200px;
+  padding: 5px;
+  width: 80%;
+  float: left;
+}
+
+.item_user_center_link_item {
+  border-bottom: 1px solid #ccc;
+}
+
+.item_user_center_link_item h3 {
+  border-bottom: 1px solid #eee;
+}
+

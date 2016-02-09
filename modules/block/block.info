@@ -1,0 +1,12 @@
+<?php
+// $Id$
+
+$info = array(
+  'name' => '区块',
+  'description' => '侧边栏模块',
+  'ver' => '1.0',
+  'weight' => 98,
+  'language' => 'zh-hans',
+  'created' => mktime(13, 25, 15, 11, 18, 2009), // 创建时间
+  'updated' => mktime(13, 25, 15, 11, 18, 2009), // 更新时间
+);

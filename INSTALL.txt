@@ -1,0 +1,18 @@
+// $Id$
+
+环境需求：mysql 5+ php 5.2+  PDO mb json
+目录权限，以下目录必须可读写：
+sites/files
+sites/logs
+sites/cache
+
+若 sites 目录不可写，请创建一个空文件：
+sites/setting.php 将其权限设置为可读写
+
+安装步骤：
+1、创建数据库
+2、运行 index.php 按引导操作
+3、安装成功，进入 admin/ 设置站点
+
+注意：
+默认压缩包不含用于生成为图片验证码的中文字体文件，若需使用图片验证码，请根据 tools/ 中的说明文件操作

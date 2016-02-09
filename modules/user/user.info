@@ -1,0 +1,14 @@
+<?php
+// $Id$
+
+$info = array(
+  'name' => '用户管理',
+  'pack' => '核心',
+  'description' => '用户管理模块。',
+  'ver' => '1.0',
+  'weight' => 99,
+  'language' => 'zh-hans',
+  'created' => mktime(21, 16, 0, 9, 8, 2009), // 创建时间
+  'updated' => mktime(10, 32, 0, 11, 18, 2009), // 更新时间
+  'init' => 1, //初始化加载
+);

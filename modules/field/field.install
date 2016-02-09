@@ -1,0 +1,392 @@
+<?php
+// $Id$
+
+/**
+ * @Implement of hook_update_X()
+ */
+function field_update_4() {
+  return db_add_index('fields_term_node', 'nid', array('nid'));
+}
+
+/**
+ * @Implement of hook_update_X()
+ */
+function field_update_3() {
+  /**
+   * 增加字段分组，便于表单布局
+   */
+  $ret = array();
+
+  $field = array(
+    'type' => 'varchar',
+    'length' => 32,
+    'not null' => true,
+    'default' => '',
+    'description' => '字段分组'
+  );
+
+  $ret = db_add_field('fields', 'groups', $field);
+  
+  field_get_cache_field(NULL, 1);
+  
+  return $ret;
+}
+
+
+/*
+ * @Implement of hook_update_X()
+ */
+function field_update_2() {
+
+  /**
+   * 改变 fields 表中 field_type、type 字段的长度
+   */
+  $ret = array();
+
+  $field_type = array(
+    'type' => 'varchar',
+    'length' => 32,
+    'not null' => true,
+    'default' => '',
+    'description' => '字段类型标识'
+  );
+  
+  $type = array(
+    'type' => 'varchar',
+    'length' => 32,
+    'not null' => true,
+    'default' => '',
+    'description' => '调用标识'
+  );
+
+  if ($ret = db_change_field('fields', 'field_type', 'field_type', $field_type)) {
+    $ret += db_change_field('fields', 'type', 'type', $type);
+  }
+  
+  return $ret;
+}
+
+/**
+ * @Implement of hook_update_X()
+ */
+function field_update_1() {
+  /**
+   * 字段增加索引值 field_key，在节点调用中，可输出关联数组，方便调用
+   */
+  $ret = array();
+  $field_key = array(
+    'type' => 'varchar',
+    'length' => 128,
+    'not null' => true,
+    'default' => '',
+    'description' => '字段索引'
+  );
+  
+  $ret = db_add_field('fields', 'field_key', $field_key);
+  
+  if($ret){
+    db_exec('UPDATE {fields} SET field_key = field_id');
+    db_add_unique('fields', 'ftm', array('field_key', 'type', 'module'));
+  }
+  
+  field_get_cache_field(NULL, 1);
+  
+  return $ret;
+}
+
+/**
+ * @Implement of hook_schema()
+ */
+function field_schema() {
+  $schema['fields'] = array(
+    'description' => '字段',
+    'fields' => array(
+      'field_id' => array(
+        'type' => 'serial',
+        'unsigned' => true,
+        'not null' => true,
+      ),
+    	'field_type' => array(
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => true,
+        'default' => '',
+        'description' => '字段类型标识'
+      ),
+      'field_key' => array(
+        'type' => 'varchar',
+        'length' => 128,
+        'not null' => true,
+        'default' => '',
+        'description' => '字段索引'
+      ),
+    	'field_func' => array(
+        'type' => 'varchar',
+        'length' => 64,
+        'not null' => true,
+        'default' => '',
+        'description' => '字段数据处理方式，空为默认 或 指定的函数'
+      ),
+    	'groups' => array(
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => true,
+        'default' => '',
+        'description' => '字段分组'
+      ),
+    	'type' => array(
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => true,
+        'default' => '',
+        'description' => '调用标识'
+      ),
+    	'module' => array(
+        'type' => 'varchar',
+        'length' => 64,
+        'not null' => true,
+        'default' => '',
+        'description' => '创建字段的模块'
+      ),
+      'name' => array(
+        'type' => 'varchar',
+        'length' => 64,
+        'not null' => true,
+        'default' => '',
+        'description' => '名称',
+      ),
+      'weight' => array(
+        'type' => 'int',
+        'not null' => true,
+        'default' => 0,
+        'description' => '权重'
+      ),
+      'required' => array(
+        'type' => 'int',
+        'not null' => true,
+        'default' => 0,
+        'size' => 'tiny',
+        'description' => '是否必须',
+      ),
+      'access' => array(
+        'type' => 'text',
+        'not null' => false,
+        'size' => 'tiny',
+        'serialize' => true,
+        'description' => '访问权限'
+      ),
+     'deleted' => array(
+        'type' => 'int',
+        'not null' => true,
+        'default' => 1,
+        'size' => 'tiny',
+        'description' => '是否允许从界面删除，1 为允许',
+      ),
+     'locked' => array(
+        'type' => 'int',
+        'not null' => true,
+        'default' => 0,
+        'size' => 'tiny',
+        'description' => '是否锁定，即不允许从界面编辑，1 为锁定',
+      ),
+      'data' => array(
+        'type' => 'text',
+        'not null' => false,
+        'size' => 'medium',
+        'serialize' => true,
+        'description' => '配置参数'
+      ),
+    ),
+    'indexes' => array(
+      'weight' => array('weight'),
+    ),
+    'unique keys' => array(
+      'ftm' => array('field_key', 'type', 'module'),
+    ),
+    'primary key' => array('field_id'),
+  );
+  
+  $schema['fields_small'] = array(
+    'description' => '短文本',
+    'fields' => array(
+    	'nid' => array(
+        'type' => 'int',
+        'unsigned' => true,
+        'not null' => true,
+        'default' => 0,
+        'description' => '扩展 id'
+      ),
+      'field_id' => array(
+        'type' => 'int',
+        'unsigned' => true,
+        'not null' => true,
+        'default' => 0,
+        'description' => '字段 id'
+      ),
+      'text' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => true,
+        'default' => '',
+        'description' => '值'
+      ),
+    ),
+    'foreign keys' => array(
+    	'field_id' => array(
+    		'table' => 'fields',
+    		'field' => 'field_id',
+    		'update' => 'cascade',
+    		'delete' => 'cascade'
+    	)
+    ),
+    'indexes' => array('nid' => array('nid'), 'field_id' => array('field_id')),
+  );
+  
+  $schema['fields_long'] = array(
+    'description' => '长文本',
+    'fields' => array(
+    	'nid' => array(
+        'type' => 'int',
+        'unsigned' => true,
+        'not null' => true,
+        'default' => 0,
+        'description' => '扩展 id'
+      ),
+      'field_id' => array(
+        'type' => 'int',
+        'not null' => true,
+        'unsigned' => true,
+        'default' => 0,
+        'description' => '字段 id'
+      ),
+      'text' => array(
+        'type' => 'text',
+        'not null' => false,
+        'size' => 'big',
+        'description' => '值'
+      ),
+    ),
+    'foreign keys' => array(
+    	'field_id' => array(
+    		'table' => 'fields',
+    		'field' => 'field_id',
+    		'update' => 'cascade',
+    		'delete' => 'cascade'
+    	)
+    ),
+    'indexes' => array('nid' => array('nid'), 'field_id' => array('field_id')),
+  );
+  
+  $schema['fields_term'] = array(
+    'description' => '分类字段',
+    'fields' => array(
+      'tid' => array(
+        'type' => 'serial',
+        'unsigned' => true,
+        'not null' => true,
+      ),
+      'pid' => array(
+        'type' => 'int',
+        'not null' => true,
+        'unsigned' => true,
+        'default' => 0,
+        'description' => '上级id'
+      ),
+      'field_id' => array(
+        'type' => 'int',
+        'not null' => true,
+        'unsigned' => true,
+        'default' => 0,
+        'description' => '根id'
+      ),
+      'weight' => array(
+        'type' => 'int',
+        'not null' => true,
+        'default' => 0,
+        'description' => '权重'
+      ),
+      'description' => array(
+        'type' => 'text',
+        'not null' => false,
+        'size' => 'big',
+        'description' => '描述'
+      ),
+      'name' => array(
+        'type' => 'varchar',
+        'length' => 64,
+        'not null' => true,
+        'default' => '',
+        'description' => '名称',
+      ),
+    ),
+    'indexes' => array(
+      'field_id' => array('field_id'),
+      'pid' => array('pid'),
+    ),
+    'unique keys' => array(
+      'pfn' => array('pid', 'field_id', 'name'),
+    ),
+    'foreign keys' => array(
+    	'field_id' => array(
+    		'table' => 'fields',
+    		'field' => 'field_id',
+    		'update' => 'cascade',
+    		'delete' => 'cascade'
+    	)
+    ),
+    'primary key' => array('tid'),
+  );
+  
+  $schema['fields_term_node'] = array(
+    'description' => '分类字段下的文章',
+    'fields' => array(
+      'tid' => array(
+        'type' => 'int',
+        'not null' => true,
+        'unsigned' => true,
+        'description' => '分类 id'
+      ),
+      'nid' => array(
+        'type' => 'int',
+        'not null' => true,
+        'unsigned' => true,
+        'description' => '文章 id'
+      ),
+    ),
+    'unique keys' => array(
+      'tid' => array('tid', 'nid'),
+    ),
+    'indexes' => array(
+      'nid' => array('nid'),
+    ),
+    'foreign keys' => array(
+    	'tid' => array(
+    		'table' => 'fields_term',
+    		'field' => 'tid',
+    		'update' => 'cascade',
+    		'delete' => 'cascade'
+    	)
+    ),
+  );
+  return $schema;
+}
+
+function field_install() {
+  $ret = array();
+  $ret = module_install_schema('install', 'field');
+  
+  /**
+   * 创建一个头像字段
+   */
+  
+  return $ret;
+}
+
+/**
+ * @Implement of hook_uninstall()
+ */
+function field_uninstall() {
+  $ret = array();
+  $ret = module_install_schema('uninstall', 'field');
+  return $ret;
+}

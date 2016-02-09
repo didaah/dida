@@ -1,0 +1,350 @@
+<?php
+// $Id$
+
+/**
+ * @Implement of hook_update_x()
+ *  增加表 user_ext，用于与第三方认证等关联
+ */
+function user_update_6(){
+  $ret = array();
+  
+  if($field = module_get_table('user', 'user_ext')){
+    $ret = db_create_table('user_ext', $field);
+  }
+  
+  return $ret;
+}
+
+/**
+ * @Implement of hook_update_x()
+ * users 表添加 salt 字段，密码随机数，加强帐号安全
+ */
+function user_update_5() {
+  $salt = array(
+    'type' => 'char',
+    'length' => 6,
+    'not null' => TRUE,
+    'default' => '',
+    'description' => '密码随机数'
+  );
+  
+  if ($ret = db_add_field('users', 'salt', $salt)) {
+    // 修改已有用户密码及写入随机数
+    if ($fetch = db_query('SELECT uid, pass FROM {users}')) {
+      foreach ($fetch as $o) {
+        $salt = dd_get_rand_string(6);
+        db_exec('UPDATE {users} SET pass = ?, salt = ? WHERE uid = ?',
+        array(md5($o->pass . $salt), $salt, $o->uid));
+      }
+    }
+  }
+  
+  return $ret;
+}
+
+function user_schema() {
+  $schema['role'] = array(
+    'description' => '用户权限角色组',
+    'fields' => array(
+      'rid' => array(
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'name' => array(
+        'type' => 'varchar',
+        'length' => 16,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => '角色组名称',
+      ),
+      'perm' => array(
+        'type' => 'text',
+        'not null' => FALSE,
+        'size' => 'big',
+        'serialize' => true,
+        'description' => '角色组对应权限'
+      ),
+      'count' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => '该角色会员数量'
+      ),
+    ),
+    'primary key' => array('rid'),
+  );
+
+  $schema['users'] = array(
+    'description' => '用户表',
+    'fields' => array(
+      'uid' => array(
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'name' => array(
+        'type' => 'varchar',
+        'length' => 64,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => '昵称'
+      ),
+      'pass' => array(
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => '密码'
+      ),
+      'newpass' => array(
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => '找回密码，生成一个验证码'
+      ),
+      'mail' => array(
+        'type' => 'varchar',
+        'length' => 64,
+        'not null' => FALSE,
+        'default' => '',
+        'description' => '邮箱/登录帐号'
+      ),
+      'validate' => array(
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => '登录安全验证码'
+      ),
+      'safe' => array(
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => '帐号保护密码'
+      ),
+      'theme' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => '用户主题',
+      ),
+      'language' => array(
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => '用户语言',
+      ),
+      'created' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => '注册时间',
+      ),
+      'salt' => array(
+        'type' => 'char',
+        'length' => 6,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => '密码随机数'
+      ),
+      'login' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => '最新登陆时间',
+      ),
+      'count' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => '登录次数',
+      ),
+      'active' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => '最近活动时间',
+      ),
+      'online' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unsigned' => TRUE,
+        'default' => 0,
+        'description' => '在线时间',
+      ),
+      'status' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'size' => 'tiny',
+        'description' => '0：未激活。1、允许。2：阻止。3、注销',
+      ),
+      'host' => array(
+        'description' => '最后登录ip',
+        'type' => 'varchar',
+        'length' => 128,
+        'not null' => TRUE,
+        'default' => ''
+      ),
+      'session' => array(
+        'description' => 'session',
+        'type' => 'varchar',
+        'length' => 64,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'data' => array(
+        'type' => 'text',
+        'not null' => FALSE,
+        'size' => 'big',
+        'serialize' => true,
+        'description' => '其它数据',
+      ),
+    ),
+    'indexes' => array(
+      'created' => array('created'),
+      'login' => array('login'),
+      'count' => array('count'),
+      'online' => array('online'),
+      'active' => array('active'),
+    	'language' => array('language')
+    ),
+    'unique keys' => array(
+      'name' => array('name'),
+      'mail' => array('mail')
+    ),
+    'primary key' => array('uid'),
+  );
+
+  $schema['user_roles'] = array(
+    'description' => '用户所属角色组，可属多个角色组，权限叠加',
+    'fields' => array(
+      'uid' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unsigned' => TRUE,
+      ),
+      'rid' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'unsigned' => TRUE,
+      ),
+    ),
+    'unique keys' => array(
+      'role' => array('uid', 'rid'),
+    ),
+    'foreign keys' => array(
+    	'uid' => array(
+    		'table' => 'users',
+    		'field' => 'uid',
+    		'update' => 'cascade',
+    		'delete' => 'cascade'
+    	),
+    	'rid' => array(
+    		'table' => 'role',
+    		'field' => 'rid',
+    		'update' => 'cascade',
+    		'delete' => 'cascade'
+    	)
+    ),
+  );
+
+  $schema['user_ext'] = array(
+    'description' => '与第三方关联的用户，一个系统用户可关联多个第三方用户',
+    'fields' => array(
+      'aid' => array(
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'uid' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => '在 users 中的 uid',
+      ),
+      'ext_name' => array(
+        'description' => '第三方用户名',
+        'type' => 'varchar',
+        'length' => 64,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'ext_type' => array(
+        'description' => '第三方类型或其它标识',
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'type' => array(
+        'description' => '模块自定义标识，如：weibo',
+        'type' => 'varchar',
+        'length' => 16,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'ext_id' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => '扩展 id',
+      ),
+      'data' => array(
+        'type' => 'text',
+        'not null' => FALSE,
+        'size' => 'big',
+        'serialize' => true,
+        'description' => '其它数据',
+      ),
+      'timestamp' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => '时间',
+      ),
+    ),
+    'indexes' => array(
+      'type' => array('type'),
+      'uid' => array('uid'),
+      'ta' => array('type', 'aid'),
+      'tt' => array('type', 'ext_type'),
+      'ti' => array('type', 'ext_id'),
+      'tn' => array('type', 'ext_name'),
+    ),
+    'foreign keys' => array(
+    	'uid' => array(
+    		'table' => 'users',
+    		'field' => 'uid',
+    		'update' => 'cascade',
+    		'delete' => 'cascade'
+    	),
+    ),
+    'primary key' => array('aid'),
+  );
+
+  return $schema;
+}
+
+function user_install() {
+  $ret = array();
+  $ret = module_install_schema('install', 'user');
+  
+  db_query('INSERT INTO {role} (name) VALUES (?), (?)', array('游客', '登录用户'));
+  $settings = array('register' => true, 'status' => 0, 'anonymous' => '游客', 'anonymous_role' => 1, 'default_role' => 2, 'redirect' => 'user/[uid]');
+  db_query('INSERT INTO {variable} (name, value) VALUES (?, ?)', array('user', serialize($settings)));
+  return $ret;
+}
